@@ -2,7 +2,8 @@ name: Build GOLD GKI baseline (android15-6.6, 4 KB)
 
 # Baseline, unmodified build of the exact Google GKI that the phone reports:
 #   uname -r 6.6.118-android15-8-ge56cf6b09cca-ab15511674-4k
-#   -> common HEAD e56cf6b09cca... (short 12), version 6.6.118, build 15511674, 4 KB pages
+#   -> kernel/common tag android15-6.6-2026-01_r34 = commit
+#      e56cf6b09cca2151bcee244b3d334fb68685ff57, version 6.6.118, build 15511674, 4 KB pages
 #
 # Safety: this workflow ONLY compiles. It downloads public AOSP source from Google's
 # canonical servers (android.googlesource.com) and uploads the raw kernel image/modules
@@ -22,10 +23,12 @@ permissions:
 
 env:
   MANIFEST_URL: https://android.googlesource.com/kernel/manifest
-  # Candidate manifest refs, tried in order. Release refs of frozen monthly branches
-  # do not move; the verify step below enforces the exact commit regardless.
-  MANIFEST_REF_TAG: common-android15-6.6-2026-01_r34
-  MANIFEST_REF_BRANCH: common-android15-6.6-2026-01
+  # The manifest branch for the January-2026 android15-6.6 GKI release.
+  # The matching kernel/common TAG is pinned below via a local manifest,
+  # because the manifest branch pins `common` to a moving branch.
+  MANIFEST_REF: common-android15-6.6-2026-01
+  COMMON_TAG: android15-6.6-2026-01_r34
+  EXPECTED_FULL_SHA: e56cf6b09cca2151bcee244b3d334fb68685ff57
   EXPECTED_SHORT_SHA: e56cf6b09cca
   EXPECTED_VERSION: 6.6.118
   GKI_BUILD_ID: "15511674"
@@ -56,7 +59,7 @@ jobs:
           fi
           repo --version
 
-      - name: Repo init (release tag first, monthly branch as fallback)
+      - name: Repo init (manifest branch)
         run: |
           set -e
           WS="$GITHUB_WORKSPACE/gki"
@@ -64,51 +67,54 @@ jobs:
           cd "$WS"
           git config --global user.email "gold-kernel-ci@invalid"
           git config --global user.name "gold-kernel-ci"
-          USED=""
-          for REF in "$MANIFEST_REF_TAG" "$MANIFEST_REF_BRANCH"; do
-            echo "::group::Trying manifest ref: $REF"
-            rm -rf .repo
-            if repo init -u "$MANIFEST_URL" -b "$REF" --depth=1; then
-              USED="$REF"
-              echo "::endgroup::"
-              echo "Using manifest ref: $REF"
-              break
-            fi
-            echo "::endgroup::"
-            echo "ref $REF not usable, trying next"
-          done
-          if [ -z "$USED" ]; then
-            echo "::error::Neither $MANIFEST_REF_TAG nor $MANIFEST_REF_BRANCH could be used as manifest ref"
-            exit 1
-          fi
-          echo "MANIFEST_REF=$USED" >> "$GITHUB_ENV"
+          repo init -u "$MANIFEST_URL" -b "$MANIFEST_REF" --depth=1
 
-      - name: Repo sync (depth 1, current ref only)
+      - name: Pin common to the exact release tag (local manifest)
+        run: |
+          set -e
+          WS="$GITHUB_WORKSPACE/gki"
+          mkdir -p "$WS/.repo/local_manifests"
+          cat > "$WS/.repo/local_manifests/gold-pin.xml" <<EOF
+          <?xml version="1.0" encoding="UTF-8"?>
+          <manifest>
+            <project path="common" name="kernel/common"
+                     revision="${COMMON_TAG}"
+                     upstream="android15-6.6-2026-01"
+                     dest-branch="android15-6.6-2026-01" />
+          </manifest>
+          EOF
+          echo "Local manifest pin:"
+          cat "$WS/.repo/local_manifests/gold-pin.xml"
+
+      - name: Repo sync (depth 1)
         run: |
           cd "$GITHUB_WORKSPACE/gki"
-          repo sync -c --no-tags -j"$(nproc)"
+          repo sync --no-tags -j"$(nproc)"
 
       - name: Verify the pinned source matches the phone's kernel
         run: |
           cd "$GITHUB_WORKSPACE/gki/common"
           SHA=$(git rev-parse HEAD)
           SHORT=$(git rev-parse --short=12 HEAD)
+          DESC=$(git describe --tags --exact-match HEAD 2>/dev/null || echo "not-on-tag")
           V1=$(awk -F'=' '/^VERSION =/{gsub(/ /,"",$2);print $2}' Makefile)
           V2=$(awk -F'=' '/^PATCHLEVEL =/{gsub(/ /,"",$2);print $2}' Makefile)
           V3=$(awk -F'=' '/^SUBLEVEL =/{gsub(/ /,"",$2);print $2}' Makefile)
           VER="$V1.$V2.$V3"
           {
             echo "manifest_ref=$MANIFEST_REF"
+            echo "common_tag=$COMMON_TAG"
             echo "common_sha=$SHA"
+            echo "common_describe=$DESC"
             echo "kernel_version=$VER"
             echo "phone_uname=6.6.118-android15-8-ge56cf6b09cca-ab15511674-4k"
             echo "gki_build_id=$GKI_BUILD_ID"
             echo "page_size=4k"
             echo "modified=no"
           } | tee "$GITHUB_WORKSPACE/build-info.txt"
-          echo "common HEAD: $SHA (short $SHORT), version $VER"
-          if [ "$SHORT" != "$EXPECTED_SHORT_SHA" ]; then
-            echo "::error::common HEAD short $SHORT != expected $EXPECTED_SHORT_SHA. Refusing to build unverified source. Pin the exact tag in MANIFEST_REF_TAG."
+          echo "common HEAD: $SHA (short $SHORT), describe: $DESC, version $VER"
+          if [ "$SHA" != "$EXPECTED_FULL_SHA" ]; then
+            echo "::error::common HEAD $SHA != expected $EXPECTED_FULL_SHA ($COMMON_TAG). Refusing to build unverified source."
             exit 1
           fi
           if [ "$VER" != "$EXPECTED_VERSION" ]; then
