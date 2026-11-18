@@ -10,6 +10,10 @@ name: Build GOLD GKI baseline (android15-6.6, 4 KB)
 # as a build artifact. Nothing is flashed to any device. The artifact is NOT-FLASHABLE:
 # a raw kernel Image is not a boot.img — the ROM's vbmeta/boot layout and vendor modules
 # must be checked before any test on the phone.
+#
+# Note on diagnostics: run logs are not retrievable via the API from all environments,
+# so risky steps echo their most useful lines as ::error:: annotations (readable via the
+# check-runs annotations API) before exiting non-zero.
 
 on:
   workflow_dispatch:
@@ -29,7 +33,6 @@ env:
   MANIFEST_REF: common-android15-6.6-2026-01
   COMMON_TAG: android15-6.6-2026-01_r34
   EXPECTED_FULL_SHA: e56cf6b09cca2151bcee244b3d334fb68685ff57
-  EXPECTED_SHORT_SHA: e56cf6b09cca
   EXPECTED_VERSION: 6.6.118
   GKI_BUILD_ID: "15511674"
 
@@ -74,22 +77,33 @@ jobs:
           set -e
           WS="$GITHUB_WORKSPACE/gki"
           mkdir -p "$WS/.repo/local_manifests"
-          cat > "$WS/.repo/local_manifests/gold-pin.xml" <<EOF
-          <?xml version="1.0" encoding="UTF-8"?>
+          cat > "$WS/.repo/local_manifests/gold-pin.xml" <<'EOF'
           <manifest>
             <project path="common" name="kernel/common"
-                     revision="${COMMON_TAG}"
+                     revision="android15-6.6-2026-01_r34"
                      upstream="android15-6.6-2026-01"
                      dest-branch="android15-6.6-2026-01" />
           </manifest>
           EOF
+          # Strip leading 10-space indent added for YAML readability
+          sed -i -E 's/^          //' "$WS/.repo/local_manifests/gold-pin.xml"
           echo "Local manifest pin:"
           cat "$WS/.repo/local_manifests/gold-pin.xml"
 
       - name: Repo sync (depth 1)
         run: |
+          set +e
           cd "$GITHUB_WORKSPACE/gki"
-          repo sync --no-tags -j"$(nproc)"
+          repo sync -j"$(nproc)" 2>&1 | tee /tmp/repo-sync.log
+          rc=${PIPESTATUS[0]}
+          if [ $rc -ne 0 ]; then
+            echo "::error::repo sync failed (exit $rc). Matching log lines:"
+            grep -iE 'fatal|error|not found|denied|refus|invalid|cannot|unable|failed|malformed' /tmp/repo-sync.log | tail -25 | while IFS= read -r line; do
+              esc=$(printf '%s' "$line" | sed -e 's/%/%25/g' -e 's/\r//g')
+              echo "::error::sync: ${esc:0:250}"
+            done
+            exit $rc
+          fi
 
       - name: Verify the pinned source matches the phone's kernel
         run: |
@@ -112,7 +126,7 @@ jobs:
             echo "page_size=4k"
             echo "modified=no"
           } | tee "$GITHUB_WORKSPACE/build-info.txt"
-          echo "common HEAD: $SHA (short $SHORT), describe: $DESC, version $VER"
+          echo "::notice::common HEAD $SHA ($DESC), version $VER"
           if [ "$SHA" != "$EXPECTED_FULL_SHA" ]; then
             echo "::error::common HEAD $SHA != expected $EXPECTED_FULL_SHA ($COMMON_TAG). Refusing to build unverified source."
             exit 1
@@ -124,13 +138,29 @@ jobs:
 
       - name: Build GKI kernel (aarch64, 4 KB pages, unmodified config)
         run: |
+          set +e
           cd "$GITHUB_WORKSPACE/gki"
           ls -la
           if [ ! -x tools/bazel ]; then
-            echo "::error::tools/bazel not found after repo sync. Workspace layout differs from the documented Kleaf flow; see log above."
+            echo "::error::tools/bazel not found after repo sync. Workspace layout differs from the documented Kleaf flow."
+            ls -la tools/ 2>&1 | head -20
             exit 1
           fi
-          tools/bazel run //common:kernel_aarch64_dist -- --destdir="$GITHUB_WORKSPACE/dist"
+          tools/bazel run //common:kernel_aarch64_dist -- --destdir="$GITHUB_WORKSPACE/dist" 2>&1 | tee /tmp/bazel.log
+          rc=${PIPESTATUS[0]}
+          if [ $rc -ne 0 ]; then
+            echo "::error::Bazel build failed (exit $rc). Matching log lines:"
+            grep -iE 'error|FAILED|fatal|cannot|no such|denied|refused|timeout|not found' /tmp/bazel.log | tail -35 | while IFS= read -r line; do
+              esc=$(printf '%s' "$line" | sed -e 's/%/%25/g' -e 's/\r//g')
+              echo "::error::bazel: ${esc:0:250}"
+            done
+            echo "::error::bazel: full log tail:"
+            tail -15 /tmp/bazel.log | while IFS= read -r line; do
+              esc=$(printf '%s' "$line" | sed -e 's/%/%25/g' -e 's/\r//g')
+              echo "::error::tail: ${esc:0:250}"
+            done
+            exit $rc
+          fi
 
       - name: Show dist contents
         run: |
@@ -144,3 +174,14 @@ jobs:
           path: dist/
           retention-days: 14
           if-no-files-found: error
+
+      - name: Diagnostics on failure (annotations)
+        if: failure()
+        run: |
+          echo "::error::Job failed — see annotations above."
+          if [ -f "$GITHUB_WORKSPACE/build-info.txt" ]; then
+            while IFS= read -r line; do echo "::error::build-info: $line"; done < "$GITHUB_WORKSPACE/build-info.txt"
+          fi
+          if [ -d "$GITHUB_WORKSPACE/gki/common" ]; then
+            echo "::error::common HEAD at failure: $(git -C "$GITHUB_WORKSPACE/gki/common" rev-parse HEAD 2>/dev/null || echo unknown)"
+          fi
