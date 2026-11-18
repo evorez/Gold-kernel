@@ -79,14 +79,13 @@ jobs:
           mkdir -p "$WS/.repo/local_manifests"
           cat > "$WS/.repo/local_manifests/gold-pin.xml" <<'EOF'
           <manifest>
+            <remove-project name="kernel/common" path="common" />
             <project path="common" name="kernel/common"
                      revision="android15-6.6-2026-01_r34"
                      upstream="android15-6.6-2026-01"
                      dest-branch="android15-6.6-2026-01" />
           </manifest>
           EOF
-          # Strip leading 10-space indent added for YAML readability
-          sed -i -E 's/^          //' "$WS/.repo/local_manifests/gold-pin.xml"
           echo "Local manifest pin:"
           cat "$WS/.repo/local_manifests/gold-pin.xml"
 
