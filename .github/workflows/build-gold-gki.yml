@@ -81,7 +81,7 @@ jobs:
           <manifest>
             <remove-project name="kernel/common" path="common" />
             <project path="common" name="kernel/common"
-                     revision="android15-6.6-2026-01_r34"
+                     revision="refs/tags/android15-6.6-2026-01_r34"
                      upstream="android15-6.6-2026-01"
                      dest-branch="android15-6.6-2026-01" />
           </manifest>
