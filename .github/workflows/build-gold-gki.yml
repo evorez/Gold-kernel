@@ -1,0 +1,140 @@
+name: Build GOLD GKI baseline (android15-6.6, 4 KB)
+
+# Baseline, unmodified build of the exact Google GKI that the phone reports:
+#   uname -r 6.6.118-android15-8-ge56cf6b09cca-ab15511674-4k
+#   -> common HEAD e56cf6b09cca... (short 12), version 6.6.118, build 15511674, 4 KB pages
+#
+# Safety: this workflow ONLY compiles. It downloads public AOSP source from Google's
+# canonical servers (android.googlesource.com) and uploads the raw kernel image/modules
+# as a build artifact. Nothing is flashed to any device. The artifact is NOT-FLASHABLE:
+# a raw kernel Image is not a boot.img — the ROM's vbmeta/boot layout and vendor modules
+# must be checked before any test on the phone.
+
+on:
+  workflow_dispatch:
+
+concurrency:
+  group: gold-gki-baseline
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+env:
+  MANIFEST_URL: https://android.googlesource.com/kernel/manifest
+  # Candidate manifest refs, tried in order. Release refs of frozen monthly branches
+  # do not move; the verify step below enforces the exact commit regardless.
+  MANIFEST_REF_TAG: common-android15-6.6-2026-01_r34
+  MANIFEST_REF_BRANCH: common-android15-6.6-2026-01
+  EXPECTED_SHORT_SHA: e56cf6b09cca
+  EXPECTED_VERSION: 6.6.118
+  GKI_BUILD_ID: "15511674"
+
+jobs:
+  build:
+    name: GKI aarch64 4K dist (build 15511674, unmodified)
+    runs-on: ubuntu-latest
+    timeout-minutes: 300
+    steps:
+      - name: Free disk space for the GKI checkout
+        run: |
+          sudo rm -rf /usr/share/dotnet /usr/local/share/powershell /opt/ghc \
+            /opt/hostedtoolcache/CodeQL /usr/local/lib/android || true
+          df -h
+
+      - name: Install prerequisites
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            git curl python3 zip unzip ca-certificates
+          if ! command -v repo >/dev/null 2>&1; then
+            sudo apt-get install -y --no-install-recommends repo || {
+              curl -fsSL https://storage.googleapis.com/git-repo-downloads/repo -o /tmp/repo
+              chmod 755 /tmp/repo
+              sudo mv /tmp/repo /usr/local/bin/repo
+            }
+          fi
+          repo --version
+
+      - name: Repo init (release tag first, monthly branch as fallback)
+        run: |
+          set -e
+          WS="$GITHUB_WORKSPACE/gki"
+          mkdir -p "$WS"
+          cd "$WS"
+          git config --global user.email "gold-kernel-ci@invalid"
+          git config --global user.name "gold-kernel-ci"
+          USED=""
+          for REF in "$MANIFEST_REF_TAG" "$MANIFEST_REF_BRANCH"; do
+            echo "::group::Trying manifest ref: $REF"
+            rm -rf .repo
+            if repo init -u "$MANIFEST_URL" -b "$REF" --depth=1; then
+              USED="$REF"
+              echo "::endgroup::"
+              echo "Using manifest ref: $REF"
+              break
+            fi
+            echo "::endgroup::"
+            echo "ref $REF not usable, trying next"
+          done
+          if [ -z "$USED" ]; then
+            echo "::error::Neither $MANIFEST_REF_TAG nor $MANIFEST_REF_BRANCH could be used as manifest ref"
+            exit 1
+          fi
+          echo "MANIFEST_REF=$USED" >> "$GITHUB_ENV"
+
+      - name: Repo sync (depth 1, current ref only)
+        run: |
+          cd "$GITHUB_WORKSPACE/gki"
+          repo sync -c --no-tags -j"$(nproc)"
+
+      - name: Verify the pinned source matches the phone's kernel
+        run: |
+          cd "$GITHUB_WORKSPACE/gki/common"
+          SHA=$(git rev-parse HEAD)
+          SHORT=$(git rev-parse --short=12 HEAD)
+          V1=$(awk -F'=' '/^VERSION =/{gsub(/ /,"",$2);print $2}' Makefile)
+          V2=$(awk -F'=' '/^PATCHLEVEL =/{gsub(/ /,"",$2);print $2}' Makefile)
+          V3=$(awk -F'=' '/^SUBLEVEL =/{gsub(/ /,"",$2);print $2}' Makefile)
+          VER="$V1.$V2.$V3"
+          {
+            echo "manifest_ref=$MANIFEST_REF"
+            echo "common_sha=$SHA"
+            echo "kernel_version=$VER"
+            echo "phone_uname=6.6.118-android15-8-ge56cf6b09cca-ab15511674-4k"
+            echo "gki_build_id=$GKI_BUILD_ID"
+            echo "page_size=4k"
+            echo "modified=no"
+          } | tee "$GITHUB_WORKSPACE/build-info.txt"
+          echo "common HEAD: $SHA (short $SHORT), version $VER"
+          if [ "$SHORT" != "$EXPECTED_SHORT_SHA" ]; then
+            echo "::error::common HEAD short $SHORT != expected $EXPECTED_SHORT_SHA. Refusing to build unverified source. Pin the exact tag in MANIFEST_REF_TAG."
+            exit 1
+          fi
+          if [ "$VER" != "$EXPECTED_VERSION" ]; then
+            echo "::error::kernel version $VER != expected $EXPECTED_VERSION"
+            exit 1
+          fi
+
+      - name: Build GKI kernel (aarch64, 4 KB pages, unmodified config)
+        run: |
+          cd "$GITHUB_WORKSPACE/gki"
+          ls -la
+          if [ ! -x tools/bazel ]; then
+            echo "::error::tools/bazel not found after repo sync. Workspace layout differs from the documented Kleaf flow; see log above."
+            exit 1
+          fi
+          tools/bazel run //common:kernel_aarch64_dist -- --destdir="$GITHUB_WORKSPACE/dist"
+
+      - name: Show dist contents
+        run: |
+          find "$GITHUB_WORKSPACE/dist" -type f | sort
+          cp "$GITHUB_WORKSPACE/build-info.txt" "$GITHUB_WORKSPACE/dist/build-info.txt"
+
+      - name: Upload artifact (NOT for flashing)
+        uses: actions/upload-artifact@v7
+        with:
+          name: gold-gki-baseline-15511674-NOT-FLASHABLE
+          path: dist/
+          retention-days: 14
+          if-no-files-found: error
