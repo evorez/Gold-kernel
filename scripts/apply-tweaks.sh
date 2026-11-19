@@ -51,20 +51,16 @@ do
 done
 
 # --- BBR as the *default* congestion control --------------------------------
-# 6.6 does not hardcode "cubic" in tcp_cong.c any more; the default is the
-# kconfig string CONFIG_DEFAULT_TCP_CONG ("cubic" when unset). Setting it is
-# cleaner than patching the source and cannot break the sysctl path.
-# TCP_CONG_ADVANCED gates the DEFAULT_TCP_CONG string in net/ipv4/Kconfig: if the
-# gate is not =y the string option does not exist and kconfig silently drops the
-# value (stock GKI has both, line-for-line).
+# CONFIG_DEFAULT_TCP_CONG is a *derived* string (net/ipv4/Kconfig builds it from a
+# choice), so it cannot be set from a defconfig at all - kconfig ignores values for
+# symbols without a prompt. Stock proves the shape:
+#     CONFIG_DEFAULT_CUBIC=y
+#     # CONFIG_DEFAULT_BBR is not set
+#     CONFIG_DEFAULT_TCP_CONG="cubic"
+# Selecting the choice member is what actually changes it.
 apply 'CONFIG_TCP_CONG_ADVANCED=y'
-apply 'CONFIG_DEFAULT_TCP_CONG="bbr"'
-echo '    CONFIG_TCP_CONG_ADVANCED=y, CONFIG_DEFAULT_TCP_CONG="bbr"'
-TCPCONG="$KDIR/net/ipv4/tcp_cong.c"
-if [ -f "$TCPCONG" ]; then
-    grep -q 'CONFIG_DEFAULT_TCP_CONG' "$TCPCONG" \
-        || echo "::warning::tcp_cong.c does not reference CONFIG_DEFAULT_TCP_CONG; verify the sysctl default after boot"
-fi
+apply 'CONFIG_DEFAULT_BBR=y'
+echo '    CONFIG_TCP_CONG_ADVANCED=y, CONFIG_DEFAULT_BBR=y (-> CONFIG_DEFAULT_TCP_CONG="bbr")'
 
 # --- user supplied extra options (workflow input: extra_config) -------------
 if [ -n "$EXTRA_CONFIG" ]; then
