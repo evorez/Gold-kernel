@@ -40,6 +40,14 @@ jobs:
             echo '```'
           } >>"$GITHUB_STEP_SUMMARY"
 
+      - name: Report the layout as annotations (logs are not always reachable)
+        run: |
+          set -euo pipefail
+          for f in header_version cmdline os_version_raw kernel_size kernel_payload ramdisk_size tail_size signature_size file_size; do
+            v="$(python3 -c "import json;print(json.load(open('/tmp/boot.json')).get('$f'))")"
+            echo "::notice::boot.img $f = $v"
+          done
+
       - name: Fetch + inspect vendor_boot.img
         if: ${{ inputs.vendor_boot_url != '' }}
         run: |
@@ -52,3 +60,7 @@ jobs:
             cat /tmp/vendor.json
             echo '```'
           } >>"$GITHUB_STEP_SUMMARY"
+          for f in header_version page_size vendor_ramdisk_size dtb_size cmdline; do
+            v="$(python3 -c "import json;print(json.load(open('/tmp/vendor.json')).get('$f'))")"
+            echo "::notice::vendor_boot.img $f = $v"
+          done
