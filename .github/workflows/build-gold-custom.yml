@@ -75,9 +75,9 @@ on:
         type: string
         default: ""
       stock_symvers_url:
-        description: "Direct URL to a reference Module.symvers (optional, enables hard CRC check)"
+        description: "Reference Module.symvers for the hard CRC check (empty = the stock GKI build 15511674)"
         type: string
-        default: ""
+        default: "https://ci.android.com/builds/submitted/15511674/kernel_aarch64/latest/raw/kernel_aarch64_Module.symvers"
       formats:
         description: "Artifacts to package"
         type: choice
@@ -284,7 +284,7 @@ jobs:
               echo "::warning::could not download stock_symvers_url; only the KMI removal check runs"
             fi
           else
-            echo "::notice::no stock_symvers_url given; checking KMI list and symbol removal only"
+            echo "::notice::no stock_symvers_url given; checking KMI list and symbol removal only (no CRC parity)"
           fi
           bash "$GITHUB_WORKSPACE/scripts/check-kmi.sh" "$GITHUB_WORKSPACE/gki" "$REF"
 
