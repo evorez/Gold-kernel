@@ -2,8 +2,9 @@
 
 Workflow: **Actions → "Build GOLD custom kernel (android15-6.6, 4 KB, root + tweaks)" → Run workflow**
 
-One build takes roughly **40–70 minutes** on a stock `ubuntu-latest` runner
-(sync ~10 min, compile ~30–50 min, package <1 min).
+One build takes roughly **22 minutes measured** on a stock `ubuntu-latest` runner
+(run 44540769002: repo sync ~9 min, config + root ~2 min, Bazel 11 min, verify +
+KMI + package <1 min). Budget up to 60 min if the runner is slow.
 
 ## Inputs
 
@@ -61,6 +62,16 @@ One build takes roughly **40–70 minutes** on a stock `ubuntu-latest` runner
 Artifacts are **not** flashable by CI on their own: they need an unlocked
 bootloader, and you must keep a stock `boot.img` for rollback. See
 [FLASH.md](FLASH.md).
+
+## Known-good baseline
+
+| | |
+|---|---|
+| Last green run | `44540769002` (`main`, 2026-11-19) |
+| Inputs | defaults: `kernelsu` + SUSFS + tweaks, no stock boot.img |
+| Artifact | `gold-custom-kernelsu-susfstrue-8` |
+| Root pin | KernelSU `64833c00` |
+| SUSFS pin | `f98f0822` (`gki-android15-6.6`) |
 
 ## When a build fails
 
