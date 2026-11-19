@@ -39,30 +39,31 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          set -euo pipefail
+          set -uo pipefail
           api="repos/${{ github.repository }}/releases/tags/${{ inputs.tag }}"
-          if ! rel="$(gh api "$api" 2>&1)"; then
-            echo "::error::cannot read release ${{ inputs.tag }}: $(echo "$rel" | head -c 300)"
+          rel="$(gh api "$api" 2>/tmp/gh.err)"; rc=$?
+          if [ $rc -ne 0 ]; then
+            echo "::error::gh api $api -> exit $rc: $(tr '\n' ' ' </tmp/gh.err | head -c 250)"
             exit 1
           fi
-          url="$(echo "$rel" | python3 -c 'import json,sys;d=json.load(sys.stdin);print(next((a["url"] for a in d["assets"] if a["name"].startswith("Image-") and a["name"].endswith(".gz")),"")))')"
+          url="$(printf '%s' "$rel" | python3 -c 'import json,sys;d=json.load(sys.stdin);print(next((a["url"] for a in d["assets"] if a["name"].startswith("Image-") and a["name"].endswith(".gz")),"") )')"
+          echo "::notice::asset url: ${url:-<none>}"
           if [ -z "$url" ]; then
-            echo "::error::release ${{ inputs.tag }} has no Image-*.gz asset"
-            echo "$rel" | python3 -c 'import json,sys;[print("::error::asset: "+a["name"]) for a in json.load(sys.stdin)["assets"][:10]]'
+            printf '%s' "$rel" | python3 -c 'import json,sys;[print("::error::asset: "+a["name"]) for a in json.load(sys.stdin)["assets"][:8]]'
             exit 1
           fi
-          if ! out="$(curl -sSL --retry 3 --max-time 300 -w '%{http_code} %{size_download}' \
-                        -H "Authorization: Bearer $GH_TOKEN" -H "Accept: application/octet-stream" \
-                        -o /tmp/ours-Image.gz "$url" 2>&1)"; then
-            echo "::error::asset download failed for $url: $(echo "$out" | tail -c 300)"
+          if curl -sSL --retry 3 --max-time 300 -D /tmp/hdr.txt -w '%{http_code} %{size_download}\n' \
+                   -H "Authorization: Bearer $GH_TOKEN" -H "Accept: application/octet-stream" \
+                   -o /tmp/ours-Image.gz "$url" > /tmp/curl.out 2>/tmp/curl.err; then
+            echo "::notice::curl: $(tail -1 /tmp/curl.out)"
+          else
+            echo "::error::curl exit $?: $(tail -c 200 /tmp/curl.err | tr '\n' ' ')"
+            head -5 /tmp/hdr.txt | sed 's/^/::error::hdr /'
             exit 1
           fi
           size="$(stat -c%s /tmp/ours-Image.gz)"
-          if [ "$size" -lt 1000000 ]; then
-            echo "::error::asset download returned only $size bytes (http: $out)"
-            exit 1
-          fi
-          echo "::notice::ours: $size bytes (${{ inputs.tag }}, http: $out)"
+          echo "::notice::ours: $size bytes (${{ inputs.tag }})"
+          test "$size" -gt 1000000 || { echo "::error::downloaded file is too small ($size bytes)"; exit 1; }
 
       - name: Extract both configs and build the delta
         run: |
