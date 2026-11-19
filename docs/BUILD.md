@@ -83,7 +83,8 @@ bootloader, and you must keep a stock `boot.img` for rollback. See
 
 | | |
 |---|---|
-| Last green run | `44558056460` (`main`, 2026-11-19, 15 min) — full feature set |
+| Last green run | `44571462688` (`main`, 2026-11-19, 24 min) — full feature set **+ published release** |
+| Release | `gold-r10` — `boot.img`, AnyKernel3 zip, raw images, `SHA256SUMS.txt`, profiles, `FEATURES.md` |
 | Inputs | defaults: `kernelsu` + SUSFS + tweaks, `dev_build=false`, no stock boot.img |
 | Artifact | `gold-custom-kernelsu-susfstrue-9` (~63 MB) |
 | Root pin | KernelSU `64833c00` |
