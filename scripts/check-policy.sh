@@ -20,6 +20,10 @@
 #
 # Usage: check-policy.sh <gki-workspace-root> [built.config]
 set -euo pipefail
+# An early `set -e` death used to exit with no annotation at all, which from the
+# outside is indistinguishable from "the gate found something" (run logs are not
+# reachable from every environment). Say where it died.
+trap 'rc=$?; echo "::error::check-policy.sh aborted at line $LINENO (exit $rc)"; exit $rc' ERR
 
 KROOT="${1:?usage: check-policy.sh <gki-workspace-root> [built.config]}"
 KDIR="$KROOT/common"
