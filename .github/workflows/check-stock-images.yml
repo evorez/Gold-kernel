@@ -1,0 +1,54 @@
+# Fast check for the two Drive links: download + inspect only, no kernel build.
+# Exists because fetching the stock images is the one step that depends on how the
+# files are shared, and waiting ~10 minutes (repo sync) to find out is silly.
+name: Check stock boot images
+
+on:
+  workflow_dispatch:
+    inputs:
+      boot_img_url:
+        description: "Share/direct URL of your ROM's boot.img"
+        required: true
+        type: string
+      vendor_boot_url:
+        description: "Share/direct URL of your ROM's vendor_boot.img (optional)"
+        required: false
+        type: string
+        default: ""
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    name: download + inspect
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Fetch + inspect boot.img
+        run: |
+          set -euo pipefail
+          mkdir -p /tmp/stock
+          python3 scripts/fetch_image.py "${{ inputs.boot_img_url }}" /tmp/stock/boot.img "ANDROID!"
+          python3 scripts/bootimg.py inspect /tmp/stock/boot.img | tee /tmp/boot.json
+          {
+            echo "### boot.img"
+            echo '```json'
+            cat /tmp/boot.json
+            echo '```'
+          } >>"$GITHUB_STEP_SUMMARY"
+
+      - name: Fetch + inspect vendor_boot.img
+        if: ${{ inputs.vendor_boot_url != '' }}
+        run: |
+          set -euo pipefail
+          python3 scripts/fetch_image.py "${{ inputs.vendor_boot_url }}" /tmp/stock/vendor_boot.img "VNDRBOOT"
+          python3 scripts/bootimg.py vendor /tmp/stock/vendor_boot.img | tee /tmp/vendor.json
+          {
+            echo "### vendor_boot.img"
+            echo '```json'
+            cat /tmp/vendor.json
+            echo '```'
+          } >>"$GITHUB_STEP_SUMMARY"

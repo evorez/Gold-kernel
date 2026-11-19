@@ -209,42 +209,16 @@ jobs:
         if: ${{ inputs.boot_img_url != '' }}
         run: |
           set -euo pipefail
-          direct() {   # Google Drive share links -> direct download, anything else as-is
-            local u="$1" id=""
-            case "$u" in
-              *drive.google.com/file/d/*) id="${u#*file/d/}"; id="${id%%/*}" ;;
-              *id=*)                      id="${u#*id=}";   id="${id%%&*}" ;;
-            esac
-            if [ -n "$id" ]; then
-              printf 'https://drive.usercontent.google.com/download?id=%s&export=download&confirm=t' "$id"
-            else
-              printf '%s' "$u"
-            fi
-          }
-          fetch() {    # fetch <url> <dest> <magic>
-            local url dest magic
-            url="$(direct "$1")"; dest="$2"; magic="$3"
-            echo "==> downloading $(basename "$dest")"
-            curl -fsSL --retry 3 --retry-delay 5 --max-time 1200 -o "$dest" "$url" \
-              || { echo "::error::download failed for $1"; exit 1; }
-            local got size
-            got="$(head -c "${#magic}" "$dest")"
-            size="$(stat -c%s "$dest")"
-            if [ "$got" != "$magic" ] || [ "$size" -lt 1000000 ]; then
-              echo "::error::$(basename "$dest") is not the expected image (magic '$got', $size bytes)."
-              echo "::error::Share it as 'anyone with the link' and pass the /file/d/<id>/ link."
-              echo "::error::If the link is a Drive share link, keep it as /file/d/<id>/view and share as 'anyone with the link'."
-              exit 1
-            fi
-            echo "    $(basename "$dest"): $size bytes, magic OK"
-          }
-
           mkdir -p "$GITHUB_WORKSPACE/stock"
-          fetch "$BOOT_IMG_URL" "$GITHUB_WORKSPACE/stock/boot.img" "ANDROID!"
-          python3 "$GITHUB_WORKSPACE/scripts/bootimg.py" inspect "$GITHUB_WORKSPACE/stock/boot.img" | sed 's/^/    /'
+          python3 "$GITHUB_WORKSPACE/scripts/fetch_image.py" \
+            "$BOOT_IMG_URL" "$GITHUB_WORKSPACE/stock/boot.img" "ANDROID!"
+          python3 "$GITHUB_WORKSPACE/scripts/bootimg.py" \
+            inspect "$GITHUB_WORKSPACE/stock/boot.img" | sed 's/^/    /'
           if [ -n "${VENDOR_BOOT_URL:-}" ]; then
-            fetch "$VENDOR_BOOT_URL" "$GITHUB_WORKSPACE/stock/vendor_boot.img" "VNDRBOOT"
-            python3 "$GITHUB_WORKSPACE/scripts/bootimg.py" vendor "$GITHUB_WORKSPACE/stock/vendor_boot.img" | sed 's/^/    /'
+            python3 "$GITHUB_WORKSPACE/scripts/fetch_image.py" \
+              "$VENDOR_BOOT_URL" "$GITHUB_WORKSPACE/stock/vendor_boot.img" "VNDRBOOT"
+            python3 "$GITHUB_WORKSPACE/scripts/bootimg.py" \
+              vendor "$GITHUB_WORKSPACE/stock/vendor_boot.img" | sed 's/^/    /'
           else
             echo "::notice::no vendor_boot_url given; the dtb/vendor ramdisk are not inspected (they are never modified either way)"
           fi
