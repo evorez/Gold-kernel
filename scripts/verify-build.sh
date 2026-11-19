@@ -88,7 +88,9 @@ if [ "${TWEAKS:-false}" = "true" ]; then
     for c in TCP_CONG_BBR NET_SCH_FQ LRU_GEN LRU_GEN_ENABLED; do
         need_y "$c"
     done
-    echo "    tweaks present (bbr, fq, MGLRU)"
+    grep -q '^CONFIG_DEFAULT_TCP_CONG="bbr"$' "$CFG" \
+        || { echo "::error::default TCP congestion control is not bbr"; exit 1; }
+    echo "    tweaks present (bbr + fq default, MGLRU)"
     # Nice-to-have: source may be absent on some tags, warn instead of failing.
     for c in WIREGUARD NTFS3_FS; do
         grep -q "^CONFIG_$c=y$" "$CFG" || echo "::warning::CONFIG_$c did not make it into the Image (source absent for this tag?)"
