@@ -87,8 +87,14 @@ if [ "${TWEAKS:-false}" = "true" ]; then
     for c in TCP_CONG_BBR NET_SCH_FQ LRU_GEN LRU_GEN_ENABLED; do
         need_y "$c"
     done
-    grep -q '^CONFIG_DEFAULT_TCP_CONG="bbr"$' "$CFG" \
-        || { echo "::error::default TCP congestion control is not bbr"; exit 1; }
+    if ! grep -q '^CONFIG_DEFAULT_TCP_CONG="bbr"$' "$CFG"; then
+        echo "::error::default TCP congestion control is not bbr. In-image value:"
+        grep -E 'CONFIG_(DEFAULT_TCP_CONG|TCP_CONG_ADVANCED|TCP_CONG_BBR)' "$CFG" | while IFS= read -r line; do
+            esc=$(printf '%s' "$line" | sed -e 's/%/%25/g' -e 's/\r//g')
+            echo "::error::  ${esc:0:200}"
+        done
+        exit 1
+    fi
     echo "    tweaks present (bbr + fq default, MGLRU)"
     # Nice-to-have: source may be absent on some tags, warn instead of failing.
     for c in WIREGUARD NTFS3_FS; do

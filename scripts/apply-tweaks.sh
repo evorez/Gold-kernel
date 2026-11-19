@@ -54,8 +54,12 @@ done
 # 6.6 does not hardcode "cubic" in tcp_cong.c any more; the default is the
 # kconfig string CONFIG_DEFAULT_TCP_CONG ("cubic" when unset). Setting it is
 # cleaner than patching the source and cannot break the sysctl path.
+# TCP_CONG_ADVANCED gates the DEFAULT_TCP_CONG string in net/ipv4/Kconfig: if the
+# gate is not =y the string option does not exist and kconfig silently drops the
+# value (stock GKI has both, line-for-line).
+apply 'CONFIG_TCP_CONG_ADVANCED=y'
 apply 'CONFIG_DEFAULT_TCP_CONG="bbr"'
-echo '    CONFIG_DEFAULT_TCP_CONG="bbr"'
+echo '    CONFIG_TCP_CONG_ADVANCED=y, CONFIG_DEFAULT_TCP_CONG="bbr"'
 TCPCONG="$KDIR/net/ipv4/tcp_cong.c"
 if [ -f "$TCPCONG" ]; then
     grep -q 'CONFIG_DEFAULT_TCP_CONG' "$TCPCONG" \
