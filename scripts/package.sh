@@ -5,7 +5,7 @@
 #   Image-<name> / Image-<name>.gz  <- the raw kernel (the actual deliverable)
 #   boot.img                        <- only when STOCK_BOOT is given: the user's own
 #                                      boot image with nothing but the kernel swapped
-#   AnyKernel3-<name>-<ver>.zip     <- flash from a rooted phone (KernelFlasher)
+#   AnyKernel3-<name>-<ver>.zip     <- recovery-flashable zip (TWRP/SHRP/KernelFlasher)
 #   Image / Image.gz                <- raw kernel, for manual repacking
 #   NOTES.txt / SHA256SUMS.txt      <- what this is, how to flash, rollback
 #
@@ -86,11 +86,23 @@ fi
 
 # --------------------------------------------------------------- AnyKernel3
 if has anykernel; then
-    echo "==> building AnyKernel3 zip (for KernelFlasher / recovery on a rooted phone)"
+    echo "==> building AnyKernel3 zip - flashable from a recovery (TWRP/SHRP) or KernelFlasher"
     AK3="$(mktemp -d)"
     trap 'rm -rf "$AK3"' EXIT
-    git clone --depth=1 -q https://github.com/osm0sis/AnyKernel3 "$AK3" \
-        || { echo "::error::AnyKernel3 clone failed"; exit 1; }
+    # Pinned: a zip is a *flashing* artefact, so a moving upstream default branch is
+    # not an acceptable input. Override with AK3_REF if the pin ever breaks.
+    AK3_REPO="https://github.com/osm0sis/AnyKernel3"
+    AK3_REF="${AK3_REF:-41f04bdb4ee30a44e429c2c1131d5e8bb32b15f1}"
+    git init -q "$AK3" && git -C "$AK3" remote add origin "$AK3_REPO" \
+        || { echo "::error::could not prepare the AnyKernel3 checkout"; exit 1; }
+    if git -C "$AK3" fetch -q --depth=1 origin "$AK3_REF" 2>/dev/null; then
+        git -C "$AK3" checkout -q FETCH_HEAD
+        echo "    AnyKernel3 @ $(git -C "$AK3" rev-parse --short HEAD) (pinned)"
+    else
+        echo "::warning::pinned AnyKernel3 $AK3_REF unavailable, falling back to the default branch"
+        git -C "$AK3" fetch -q --depth=1 origin HEAD && git -C "$AK3" checkout -q FETCH_HEAD \
+            || { echo "::error::AnyKernel3 clone failed"; exit 1; }
+    fi
     rm -rf "$AK3/.git" "$AK3/README.md"
     cp -f "$IMAGE" "$AK3/Image"
     cat >"$AK3/anykernel.sh" <<AKSH
@@ -105,8 +117,10 @@ do.systemless=0
 do.cleanup=1
 do.cleanuponabort=0
 device.name1=gold
-device.name2=Redmi Note 13 5G
-device.name3=xiaomi_gold
+device.name2=xiaomi_gold
+device.name3=gold_global
+device.name4=gold_eea
+device.name5=Redmi Note 13 5G
 supported.versions=
 supported.patchlevels=
 supported.vendorpatchlevels=
@@ -142,6 +156,20 @@ AKSH
         *"BLOCK=boot"*) : ;;
         *) echo "::error::packed zip is missing anykernel.sh / BLOCK=boot"; exit 1 ;;
     esac
+    # A zip that a recovery cannot actually run is worse than no zip: check the
+    # structure the recovery executes, not just that the file exists.
+    for f in META-INF/com/google/android/update-binary META-INF/com/google/android/updater-script \
+             tools/ak3-core.sh anykernel.sh Image; do
+        unzip -l "$AKZIP" "$f" >/dev/null 2>&1 || { echo "::error::AnyKernel3 zip is missing $f"; exit 1; }
+    done
+    if unzip -Z "$AKZIP" | grep -E 'update-binary$' | grep -qv 'rwx'; then
+        echo "::error::update-binary inside the zip is not executable (0755) - recovery would abort"
+        exit 1
+    fi
+    printf '%s' "$ak_sh" | sh -n || { echo "::error::anykernel.sh does not parse"; exit 1; }
+    printf '%s' "$ak_sh" | grep -q 'ak3-core.sh' || { echo "::error::anykernel.sh does not source ak3-core.sh"; exit 1; }
+    printf '%s' "$ak_sh" | grep -qE 'flash_boot|write_boot' || { echo "::error::anykernel.sh has no install path"; exit 1; }
+    echo "    recovery-flashable structure verified (update-binary 0755, ak3-core.sh, anykernel.sh, Image)"
     hits="$(unzip -p "$AKZIP" Image | strings | grep -c "$KVER" || true)"
     [ "${hits:-0}" -gt 0 ] || { echo "::error::wrong Image packed into the zip"; exit 1; }
     ls -lh "$AKZIP" | sed 's/^/    /'
@@ -182,9 +210,11 @@ chmod +x "$OUTDIR/gold-profiles.sh" 2>/dev/null || true
         echo "No boot.img was packed (no stock boot image was given) - see docs/FLASH.md."
         echo
     fi
-    echo "INSTALL (rooted phone, KernelFlasher app or a recovery):"
-    echo "  flash AnyKernel3-*.zip - it splits your existing boot and swaps only the kernel,"
-    echo "  so your stock header/dtb/ramdisk stay exactly as they are"
+    echo "INSTALL (recovery-flashable zip):"
+    echo "  TWRP/SHRP  : Install -> AnyKernel3-*.zip"
+    echo "  app        : KernelFlasher -> Flash kernel / AK3 zip (needs root)"
+    echo "  Both split your existing boot and swap ONLY the kernel, so your stock"
+    echo "  header/dtb/ramdisk stay byte-identical. vendor_boot is never touched."
     echo
     echo "ROLLBACK - keep your ROM's stock boot.img and:"
     echo "  fastboot flash boot <stock-boot.img>"

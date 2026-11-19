@@ -98,17 +98,36 @@ fastboot reboot
 Ye fastboot wala sabse seedha raasta hai. AnyKernel3 zip (2A) bhi saath aata hai —
 dono me se koi ek use karo, dono me sirf kernel badalta hai.
 
-## 2A. Install: AnyKernel3 zip (recommended)
+## 2A. Install: recovery-flashable zip (recommended)
 
-1. `AnyKernel3-*.zip` phone me copy karo.
-2. **KernelFlasher** app (FatalBullet) → "Flash kernel / AK3 zip" → zip chuno.
-   Recovery se bhi ho sakta hai (TWRP: Install → zip).
-3. App khud `boot` partition unpack → sirf kernel replace → repack karta hai.
-   Isliye aapke ROM ka header/dtb/ramdisk jaisa tha waisa hi rehta hai.
-4. Reboot. Pehla boot **2-5 minute** le sakta hai (ART dobara compile hota hai).
+Jo `AnyKernel3-*.zip` artifact me aata hai wo **recovery se flash hone wala** standard
+package hai (AnyKernel3, pinned commit). Isme `META-INF/com/android/update-binary`,
+`tools/ak3-core.sh`, `anykernel.sh` aur `Image` hote hain — CI har build par inki
+structure + permissions check karta hai.
 
-Zip khud verify karta hai: galat device par `device.name` check fail hoga, aur
-`vendor_boot` touch hi nahi hota.
+**Tarika 1 — custom recovery (TWRP / SHRP / OrangeFox):**
+1. Zip phone/SD card ya USB-OTG me rakho.
+2. Recovery me boot karo → **Install** → `AnyKernel3-*.zip` chuno → swipe to confirm.
+3. Script khud: current slot detect → `boot` split → **sirf kernel** replace → repack →
+   flash. Screen par `Installing gold-custom …` phir `Done` dikhega.
+4. Reboot to system.
+
+**Tarika 2 — KernelFlasher app (recovery ki zaroorat nahi, root chahiye):**
+App → "Flash kernel / AK3 zip" → zip chuno → Flash → Reboot.
+
+Dono me same zip chalta hai, aur `vendor_boot` / `dtbo` / `vbmeta` ko haath nahi lagta.
+
+### Agar recovery "unsupported device" bole
+
+Zip me `do.devicecheck=1` hai aur allowed names: `gold`, `xiaomi_gold`, `gold_global`,
+`gold_eea`, `Redmi Note 13 5G`. Aapke ROM ka `ro.product.device` in se match nahi kar
+raha to flash abort hoga — tab **2C** (ready-made `boot.img`, fastboot se) use karo.
+
+### Recovery se flash ke baad check
+
+```bash
+adb shell uname -r     # …-4k-gold dikhna chahiye
+```
 
 ## 2B. Optional: khud `boot.img` banana (advanced)
 

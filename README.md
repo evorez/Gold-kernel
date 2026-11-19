@@ -42,9 +42,9 @@ Actions → **Build GOLD custom kernel (android15-6.6, 4 KB, root + tweaks)** �
 Defaults are the sensible ones (`kernelsu` + SUSFS + tweaks). A build takes ~40–70 min.
 `dev_build=true` adds ftrace/perf tracing (debug only, bigger Image).
 
-Artifacts: raw `Image`/`Image.gz` (the kernel), `AnyKernel3-*.zip` (installs that kernel on a
-rooted phone without touching your boot header/dtb), `SHA256SUMS.txt`. **No `boot.img`** —
-see below.
+Artifacts: `boot.img` (when you pass `boot_img_url`: your own stock image with only the
+kernel swapped), `AnyKernel3-*.zip` (**recovery-flashable**: TWRP/SHRP Install, or the
+KernelFlasher app), raw `Image`/`Image.gz`, `SHA256SUMS.txt`.
 
 Actions artifacts expire after 14 days — set **`publish_release: true`** to also attach
 the same files to a GitHub **Release** (`releases/tag/gold-r<run>`), which is the copy

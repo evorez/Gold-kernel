@@ -82,7 +82,7 @@ KMI + package <1 min). Budget up to 60 min if the runner is slow.
 |---|---|
 | `boot.img` | **only if you passed `boot_img_url`**: your stock image with just the kernel swapped — `fastboot flash boot boot.img` |
 | `Image-*` / `Image-*.gz` | the kernel itself — use it to pack your own boot image |
-| `AnyKernel3-*.zip` | install on a rooted phone (KernelFlasher app / recovery): splits your existing boot and swaps only the kernel |
+| `AnyKernel3-*.zip` | **recovery-flashable** (TWRP/SHRP → Install, or KernelFlasher app): pins AnyKernel3 to `41f04bd`, and the build verifies `update-binary` (0755), `ak3-core.sh`, `anykernel.sh` and `Image` are inside before uploading |
 | `SHA256SUMS.txt` | integrity check before flashing |
 
 Artifacts are **not** flashable by CI on their own: they need an unlocked
