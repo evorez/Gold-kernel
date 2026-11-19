@@ -1,0 +1,307 @@
+name: Build GOLD custom kernel (android15-6.6, 4 KB, root + tweaks)
+
+# Custom kernel for the Xiaomi Redmi Note 13 5G (codename gold), built entirely in
+# CI from Google's canonical GKI source at the exact tag the phone runs:
+#   uname -r 6.6.118-android15-8-ge56cf6b09cca-ab15511674-4k
+#   -> kernel/common android15-6.6-2026-01_r34 = e56cf6b09cca..., 6.6.118, 4 KB pages
+#
+# What makes it "custom":
+#   * root: SukiSU Ultra (default) or KernelSU-Next, built into the Image
+#   * SUSFS root hiding (requires SukiSU Ultra - see scripts/apply-root.sh)
+#   * tweaks: BBR + fq by default, MGLRU, WireGuard, NTFS3, all built in
+#   * kernel name suffixed "...-4k-gold" so a flashed build is identifiable
+#
+# Safety: CI only compiles and packages. Nothing is flashed. The boot.img is
+# built with the same header shape as gold's stock boot partition (v4, kernel
+# only, no ramdisk) - but a custom kernel ALWAYS needs a stock boot.img kept
+# aside for rollback. Read docs/FLASH.md before flashing.
+#
+# Diagnostics: run logs are not retrievable via the API from all environments, so
+# risky steps echo their most useful lines as ::error:: annotations (readable via
+# the check-runs annotations API) before exiting non-zero.
+
+on:
+  workflow_dispatch:
+    inputs:
+      root_flavor:
+        description: "Root solution (sukisu = needed for SUSFS)"
+        type: choice
+        options: [sukisu, ksu-next, none]
+        default: sukisu
+      use_susfs:
+        description: "SUSFS root hiding (forced onto sukisu; ignored when root_flavor=none)"
+        type: boolean
+        default: true
+      tweaks:
+        description: "Performance tweaks (BBR+fq, MGLRU, WireGuard, NTFS3)"
+        type: boolean
+        default: true
+      ksu_ref:
+        description: "Root repo ref/commit (empty = pinned known-good)"
+        type: string
+        default: ""
+      susfs_ref:
+        description: "susfs4ksu commit on branch gki-android15-6.6 (empty = branch tip)"
+        type: string
+        default: "09fec8aa"
+      crc_stub:
+        description: "Skip genksyms CRC comparison (only if vendor modules complain)"
+        type: boolean
+        default: false
+      extra_config:
+        description: "Extra defconfig lines, one per row (e.g. CONFIG_FOO=y)"
+        type: string
+        default: ""
+      stock_boot_url:
+        description: "Direct URL to your ROM's boot.img (optional, improves header accuracy)"
+        type: string
+        default: ""
+      stock_symvers_url:
+        description: "Direct URL to a reference Module.symvers (optional, enables hard CRC check)"
+        type: string
+        default: ""
+      formats:
+        description: "Artifacts to package"
+        type: choice
+        options:
+          - "bootimg,anykernel,image"
+          - "bootimg,image"
+          - "anykernel,image"
+          - "image"
+        default: "bootimg,anykernel,image"
+
+concurrency:
+  group: gold-custom-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+env:
+  MANIFEST_URL: https://android.googlesource.com/kernel/manifest
+  MANIFEST_REF: common-android15-6.6-2026-01
+  COMMON_TAG: android15-6.6-2026-01_r34
+  EXPECTED_FULL_SHA: e56cf6b09cca2151bcee244b3d334fb68685ff57
+  EXPECTED_VERSION: 6.6.118
+  GKI_BUILD_ID: "15511674"
+  KERNEL_NAME: gold-custom
+  ROOT_FLAVOR: ${{ inputs.root_flavor }}
+  USE_SUSFS: ${{ inputs.use_susfs }}
+  TWEAKS: ${{ inputs.tweaks }}
+  KSU_REF: ${{ inputs.ksu_ref }}
+  SUSFS_REF: ${{ inputs.susfs_ref }}
+  CRC_STUB: ${{ inputs.crc_stub }}
+  EXTRA_CONFIG: ${{ inputs.extra_config }}
+  STOCK_BOOT_URL: ${{ inputs.stock_boot_url }}
+  STOCK_SYMVERS_URL: ${{ inputs.stock_symvers_url }}
+  FORMATS: ${{ inputs.formats }}
+
+jobs:
+  build:
+    name: gold custom (${{ inputs.root_flavor }}, susfs=${{ inputs.use_susfs }}, tweaks=${{ inputs.tweaks }})
+    runs-on: ubuntu-latest
+    timeout-minutes: 300
+    steps:
+      - name: Checkout this repo (scripts + docs)
+        uses: actions/checkout@v5
+
+      - name: Free disk space for the GKI checkout
+        run: |
+          sudo rm -rf /usr/share/dotnet /usr/local/share/powershell /opt/ghc \
+            /opt/hostedtoolcache/CodeQL /usr/local/lib/android || true
+          df -h
+
+      - name: Install prerequisites
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            git curl python3 zip unzip ca-certificates patch
+          if ! command -v repo >/dev/null 2>&1; then
+            sudo apt-get install -y --no-install-recommends repo || {
+              curl -fsSL https://storage.googleapis.com/git-repo-downloads/repo -o /tmp/repo
+              chmod 755 /tmp/repo
+              sudo mv /tmp/repo /usr/local/bin/repo
+            }
+          fi
+          repo --version
+
+      - name: Repo init (manifest branch)
+        run: |
+          set -e
+          WS="$GITHUB_WORKSPACE/gki"
+          mkdir -p "$WS"
+          cd "$WS"
+          git config --global user.email "gold-kernel-ci@invalid"
+          git config --global user.name "gold-kernel-ci"
+          repo init -u "$MANIFEST_URL" -b "$MANIFEST_REF" --depth=1
+
+      - name: Pin common to the exact release tag (local manifest)
+        run: |
+          set -e
+          WS="$GITHUB_WORKSPACE/gki"
+          mkdir -p "$WS/.repo/local_manifests"
+          cat > "$WS/.repo/local_manifests/gold-pin.xml" <<'EOF'
+          <manifest>
+            <remove-project name="kernel/common" path="common" />
+            <project path="common" name="kernel/common"
+                     revision="refs/tags/android15-6.6-2026-01_r34"
+                     upstream="android15-6.6-2026-01"
+                     dest-branch="android15-6.6-2026-01" />
+          </manifest>
+          EOF
+          cat "$WS/.repo/local_manifests/gold-pin.xml"
+
+      - name: Repo sync (depth 1)
+        run: |
+          set +e
+          cd "$GITHUB_WORKSPACE/gki"
+          repo sync -j"$(nproc)" 2>&1 | tee /tmp/repo-sync.log
+          rc=${PIPESTATUS[0]}
+          if [ $rc -ne 0 ]; then
+            echo "::error::repo sync failed (exit $rc). Matching log lines:"
+            grep -iE 'fatal|error|not found|denied|refus|invalid|cannot|unable|failed|malformed' /tmp/repo-sync.log | tail -25 | while IFS= read -r line; do
+              esc=$(printf '%s' "$line" | sed -e 's/%/%25/g' -e 's/\r//g')
+              echo "::error::sync: ${esc:0:250}"
+            done
+            exit $rc
+          fi
+
+      - name: Verify the pinned source matches the phone's kernel
+        run: |
+          cd "$GITHUB_WORKSPACE/gki/common"
+          SHA=$(git rev-parse HEAD)
+          DESC=$(git describe --tags --exact-match HEAD 2>/dev/null || echo "not-on-tag")
+          V1=$(awk -F'=' '/^VERSION =/{gsub(/ /,"",$2);print $2}' Makefile)
+          V2=$(awk -F'=' '/^PATCHLEVEL =/{gsub(/ /,"",$2);print $2}' Makefile)
+          V3=$(awk -F'=' '/^SUBLEVEL =/{gsub(/ /,"",$2);print $2}' Makefile)
+          VER="$V1.$V2.$V3"
+          echo "::notice::common HEAD $SHA ($DESC), version $VER"
+          if [ "$SHA" != "$EXPECTED_FULL_SHA" ]; then
+            echo "::error::common HEAD $SHA != expected $EXPECTED_FULL_SHA ($COMMON_TAG). Refusing to build unverified source."
+            exit 1
+          fi
+          if [ "$VER" != "$EXPECTED_VERSION" ]; then
+            echo "::error::kernel version $VER != expected $EXPECTED_VERSION"
+            exit 1
+          fi
+
+      - name: Align config with the stock gold kernel
+        run: bash "$GITHUB_WORKSPACE/scripts/fix-gki-config.sh" "$GITHUB_WORKSPACE/gki"
+
+      - name: Apply performance tweaks
+        if: ${{ inputs.tweaks }}
+        run: bash "$GITHUB_WORKSPACE/scripts/apply-tweaks.sh" "$GITHUB_WORKSPACE/gki"
+
+      - name: Integrate root + SUSFS
+        run: bash "$GITHUB_WORKSPACE/scripts/apply-root.sh" "$GITHUB_WORKSPACE/gki"
+
+      - name: Build GKI kernel (aarch64, 4 KB pages)
+        run: |
+          set +e
+          cd "$GITHUB_WORKSPACE/gki"
+          if [ ! -x tools/bazel ]; then
+            echo "::error::tools/bazel not found after repo sync."
+            exit 1
+          fi
+          tools/bazel run //common:kernel_aarch64_dist -- --destdir="$GITHUB_WORKSPACE/dist" 2>&1 | tee /tmp/bazel.log
+          rc=${PIPESTATUS[0]}
+          if [ $rc -ne 0 ]; then
+            echo "::error::Bazel build failed (exit $rc). Matching log lines:"
+            grep -iE 'error|FAILED|fatal|cannot|no such|denied|refused|timeout|undefined|not found' /tmp/bazel.log | tail -35 | while IFS= read -r line; do
+              esc=$(printf '%s' "$line" | sed -e 's/%/%25/g' -e 's/\r//g')
+              echo "::error::bazel: ${esc:0:250}"
+            done
+            echo "::error::bazel: tail:"
+            tail -15 /tmp/bazel.log | while IFS= read -r line; do
+              esc=$(printf '%s' "$line" | sed -e 's/%/%25/g' -e 's/\r//g')
+              echo "::error::tail: ${esc:0:250}"
+            done
+            exit $rc
+          fi
+
+      - name: Verify the built Image (config read back from the Image)
+        run: |
+          export EFFECTIVE_ROOT_FLAVOR="${EFFECTIVE_ROOT_FLAVOR:-none}"
+          export EFFECTIVE_USE_SUSFS="${EFFECTIVE_USE_SUSFS:-false}"
+          export EFFECTIVE_USE_KPM="${EFFECTIVE_USE_KPM:-false}"
+          bash "$GITHUB_WORKSPACE/scripts/verify-build.sh" "$GITHUB_WORKSPACE/gki"
+
+      - name: KMI gate (prebuilt vendor modules must still resolve)
+        run: |
+          REF=""
+          if [ -n "${STOCK_SYMVERS_URL:-}" ]; then
+            if curl -fsSL "$STOCK_SYMVERS_URL" -o /tmp/stock.symvers; then
+              REF=/tmp/stock.symvers
+              echo "::notice::reference symvers downloaded ($(wc -l </tmp/stock.symvers) symbols)"
+            else
+              echo "::warning::could not download stock_symvers_url; only the KMI removal check runs"
+            fi
+          else
+            echo "::notice::no stock_symvers_url given; checking KMI list and symbol removal only"
+          fi
+          bash "$GITHUB_WORKSPACE/scripts/check-kmi.sh" "$GITHUB_WORKSPACE/gki" "$REF"
+
+      - name: Fetch a stock boot.img (optional, for exact header values)
+        if: ${{ inputs.stock_boot_url != '' }}
+        run: |
+          set +e
+          curl -fL --retry 3 "$STOCK_BOOT_URL" -o "$GITHUB_WORKSPACE/stock-boot.img"
+          rc=$?
+          size=$(stat -c%s "$GITHUB_WORKSPACE/stock-boot.img" 2>/dev/null || echo 0)
+          magic=$(head -c 8 "$GITHUB_WORKSPACE/stock-boot.img" 2>/dev/null)
+          if [ $rc -ne 0 ] || [ "$magic" != "ANDROID!" ] || [ "$size" -lt 1000000 ]; then
+            echo "::warning::stock_boot_url did not yield a valid boot.img (rc=$rc, size=$size, magic=$magic)."
+            echo "::warning::Falling back to gold's BOARD_MKBOOTIMG_ARGS defaults."
+            rm -f "$GITHUB_WORKSPACE/stock-boot.img"
+          else
+            echo "::notice::stock boot.img downloaded ($size bytes)"
+            python3 "$GITHUB_WORKSPACE/scripts/bootimg.py" inspect "$GITHUB_WORKSPACE/stock-boot.img"
+          fi
+
+      - name: Show dist contents
+        run: find "$GITHUB_WORKSPACE/dist" -type f | sort | sed 's/^/    /'
+
+      - name: Package artifacts
+        run: |
+          export DIST="$GITHUB_WORKSPACE/dist"
+          export OUTDIR="$GITHUB_WORKSPACE/artifacts"
+          export STOCK_BOOT="$GITHUB_WORKSPACE/stock-boot.img"
+          export KERNEL_NAME FORMATS
+          bash "$GITHUB_WORKSPACE/scripts/package.sh"
+
+      - name: Build summary
+        run: |
+          {
+            echo "## gold custom kernel"
+            echo
+            echo "| field | value |"
+            echo "|---|---|"
+            echo "| GKI base | \`$COMMON_TAG\` = \`$EXPECTED_FULL_SHA\` (kernel $EXPECTED_VERSION, 4 KB pages) |"
+            echo "| root | \`${EFFECTIVE_ROOT_FLAVOR:-none}\` (susfs=${EFFECTIVE_USE_SUSFS:-false}) |"
+            echo "| rootsu sha | \`${KSU_SHA:-n/a}\` |"
+            echo "| tweaks | ${TWEAKS:-false} |"
+            echo "| crc stub | ${CRC_STUB:-false} |"
+            echo "| artifacts | $(ls "$GITHUB_WORKSPACE/artifacts" 2>/dev/null | tr '\n' ' ') |"
+            echo
+            echo "Rollback needs a stock \`boot.img\` for your ROM. Read \`docs/FLASH.md\` (Hinglish) first."
+          } >>"$GITHUB_STEP_SUMMARY"
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v7
+        with:
+          name: gold-custom-${{ inputs.root_flavor }}-susfs${{ inputs.use_susfs }}-${{ github.run_number }}
+          path: artifacts/
+          retention-days: 14
+          if-no-files-found: error
+
+      - name: Diagnostics on failure (annotations)
+        if: failure()
+        run: |
+          echo "::error::Job failed - see annotations above."
+          if [ -d "$GITHUB_WORKSPACE/gki/common" ]; then
+            echo "::error::common HEAD: $(git -C "$GITHUB_WORKSPACE/gki/common" rev-parse HEAD 2>/dev/null || echo unknown)"
+          fi
+          [ -f /tmp/bazel.log ] && tail -5 /tmp/bazel.log | while IFS= read -r line; do
+            esc=$(printf '%s' "$line" | sed -e 's/%/%25/g' -e 's/\r//g')
+            echo "::error::last: ${esc:0:250}"
+          done

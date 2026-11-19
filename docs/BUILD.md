@@ -1,0 +1,83 @@
+# Building the custom kernel (GitHub Actions only — no PC needed)
+
+Workflow: **Actions → "Build GOLD custom kernel (android15-6.6, 4 KB, root + tweaks)" → Run workflow**
+
+One build takes roughly **40–70 minutes** on a stock `ubuntu-latest` runner
+(sync ~10 min, compile ~30–50 min, package <1 min).
+
+## Inputs
+
+| Input | Default | What it does |
+|---|---|---|
+| `root_flavor` | `sukisu` | `sukisu` (SukiSU Ultra, required for SUSFS), `ksu-next` (KernelSU-Next v3.x), `none` (no root) |
+| `use_susfs` | `true` | SUSFS root hiding. Automatically redirected to `sukisu` when `ksu-next` is chosen. |
+| `tweaks` | `true` | BBR + fq as default congestion control, MGLRU, WireGuard, NTFS3 — all built in (`=y`) |
+| `ksu_ref` | *(empty)* | Pin the root repo to a commit/tag. Empty = the verified pin (`6c5603f0` for SukiSU `builtin`). |
+| `susfs_ref` | `09fec8aa` | susfs4ksu commit on branch `gki-android15-6.6`. Must stay coherent with `ksu_ref`. |
+| `crc_stub` | `false` | Patch `check_version()` to skip genksyms CRC comparison. Use **only** if vendor modules complain at boot. |
+| `extra_config` | *(empty)* | Extra defconfig lines, one per row, e.g. `CONFIG_IP_NF_TARGET_TTL=y` |
+| `stock_boot_url` | *(empty)* | Direct link to your ROM's `boot.img`. Header/cmdline/os_version are copied from it. |
+| `stock_symvers_url` | *(empty)* | Direct link to a reference `Module.symvers` (stock GKI build) → enables the **hard CRC gate**. |
+| `formats` | `bootimg,anykernel,image` | Which artifacts to package. |
+
+## What the job does
+
+1. **Verify the source.** Syncs `kernel/manifest` at `common-android15-6.6-2026-01`,
+   pins `common` to tag `android15-6.6-2026-01_r34`, and **fails** unless HEAD is
+   exactly `e56cf6b09cca2151bcee244b3d334fb68685ff57` / version `6.6.118` — the
+   build the phone is actually running.
+2. **Stock parity** (`scripts/fix-gki-config.sh`) — `MODULE_SIG_PROTECT` off,
+   LTO stays `NONE`, CFI stays on, `MODVERSIONS=y`, KPROBES/KALLSYMS on, protected
+   export lists removed, `check_defconfig` gate disabled, kernel name suffixed
+   `-4k-gold`.
+3. **Tweaks** (`scripts/apply-tweaks.sh`) — built-in only, no `.ko` to push.
+4. **Root + SUSFS** (`scripts/apply-root.sh`) — clones SukiSU/KernelSU-Next,
+   wires `drivers/kernelsu`, runs a 1-second static coherence preflight (catches
+   upstream breakage before the 20-minute compile), applies susfs4ksu
+   (`fs/*`, `include/linux/*`, `50_add_susfs_in_gki-android15-6.6.patch`),
+   registers any newly exported symbols in the KMI list.
+5. **Build** — `tools/bazel run //common:kernel_aarch64_dist`.
+6. **Verify** (`scripts/verify-build.sh`) — reads the config **back out of the
+   Image** (`IKCONFIG`) and asserts 4 KB pages, `LTO_NONE`, `CFI_CLANG`,
+   `MODVERSIONS`, `MODULE_SIG_PROTECT` off, `KSU`/`KSU_SUSFS` when requested, and
+   the tweaks; asserts the version string is `6.6.118-...-android15-8`.
+7. **KMI gate** (`scripts/check-kmi.sh`) — every symbol of
+   `android/abi_gki_aarch64` must still be exported, and (when a reference
+   `Module.symvers` is supplied) every shared symbol must have an identical CRC.
+   This is the check that prevents "compiles fine, black screen on boot".
+8. **Package** (`scripts/package.sh`) — `boot.img` (header v4, kernel only),
+   `AnyKernel3-*.zip`, raw `Image`/`Image.gz`, `NOTES.txt`, `SHA256SUMS.txt`.
+
+## Artifacts
+
+| File | Use |
+|---|---|
+| `boot.img` | `fastboot flash boot boot.img` — primary |
+| `AnyKernel3-*.zip` | rooted phone, KernelFlasher app (keeps your dtb/header) |
+| `Image-*.gz` / `Image-*` | manual repacking |
+| `SHA256SUMS.txt` | integrity check before flashing |
+
+Artifacts are **not** flashable by CI on their own: they need an unlocked
+bootloader, and you must keep a stock `boot.img` for rollback. See
+[FLASH.md](FLASH.md).
+
+## When a build fails
+
+Every risky step echoes its interesting lines as `::error::` **annotations**
+(the run's summary page shows them even when raw logs are not accessible):
+
+- `::error::sync: ...` — repo sync / tag pin problem.
+- `::error::KSU_REF ... is not buildable` — upstream root repo regression;
+  pin a good commit with `ksu_ref`.
+- `::error::SUSFS_REF ... not in branch` — susfs pin is wrong for the branch.
+- `::error::bazel: ...` / `::error::tail: ...` — compile errors.
+- `::error::CONFIG_X must be =y` — a Kconfig option was silently dropped
+  (typo, or blocked by a dependency).
+- `::error::N KMI symbol(s) are missing` — source pin or config change broke the
+  ABI; do not flash such a build.
+
+## Why not just `--lto=thin` to make it faster?
+
+Because LTO changes codegen → changes symbol CRCs → the prebuilt MediaTek
+modules refuse to load → black screen. Stock is `LTO_NONE` + `CFI_CLANG`; the
+build keeps exactly that. Same reason `MODVERSIONS` stays on.
