@@ -1,6 +1,6 @@
 # Changelog — GoldenEra
 
-Redmi Note 13 5G (**gold**) · author **𝙴𝚅𝙾𝚁𝙴𝚉**
+Redmi Note 13 5G (**gold**) · author **𝙴𝚟𝚘𝚛𝚎𝚣**
 
 Har entry ek GitHub Actions run se bani release hai (`gold-r<N>`), teeno variants
 (`root`, `susfs`, `tweaks`) ke saath. Sab kuch aapki hi stock `boot.img` +
@@ -10,7 +10,7 @@ Har entry ek GitHub Actions run se bani release hai (`gold-r<N>`), teeno variant
 
 ## GoldenEra v1 — (agla build, taiyaari ho rahi hai)
 
-Pehli baar kernel ka naam + author: **GoldenEra v1 by 𝙴𝚅𝙾𝚁𝙴𝚉**.
+Pehli baar kernel ka naam + author: **GoldenEra v1 by 𝙴𝚟𝚘𝚛𝚎𝚣**.
 `uname -r` ab `…-4k-golden` par khatam hoga, release title/notes, zip/boot.img
 ke naam aur `NOTES.txt` sab GoldenEra brand karte hain.
 
