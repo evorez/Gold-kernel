@@ -37,7 +37,7 @@ on:
         type: boolean
         default: true
       ksu_ref:
-        description: "Root repo ref/commit (empty = pinned known-good pair)"
+        description: "Root repo ref/commit (empty = pinned known-good pair: KSU 64833c00)"
         type: string
         default: ""
       susfs_ref:

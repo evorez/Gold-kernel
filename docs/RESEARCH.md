@@ -76,8 +76,8 @@ too, unless `crc_stub=true` is explicitly chosen.
   `include/linux/susfs{,_def}.h`, hooks) and
   `KernelSU/10_enable_susfs_for_ksu.patch` (root tree: supercall dispatch +
   the `KSU_SUSFS*` Kconfig symbols). Pins are a coherent pair: KernelSU
-  `c680b548` (named as the synced upstream in the SUSFS branch tip's history) and
-  SUSFS `f98f0822`. KernelSU at that revision defines `ksu_install_su_fd()`,
+  `64833c00` (named as the synced upstream in the SUSFS branch tip's commit
+  message) and SUSFS `f98f0822`. KernelSU at that revision defines `ksu_install_su_fd()`,
   which the `50_` patch's `exec.c` hunk calls — an older tree fails to link.
 - **SukiSU Ultra `builtin`** was tried first and does not build with a pinned
   SUSFS: its `kernel/supercall/dispatch.c` carries SUSFS dispatch code that
