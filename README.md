@@ -33,6 +33,20 @@ Defaults are the sensible ones (`kernelsu` + SUSFS + tweaks). A build takes ~40�
 
 Artifacts: `boot.img` (fastboot), `AnyKernel3-*.zip` (rooted phone), raw `Image`/`Image.gz`, `SHA256SUMS.txt`.
 
+### Status
+
+Last full CI build: **run 44540769002 — green** (`main`, 2026-11-19, 22 min end to end,
+~11 min of that is Bazel). Artifact: `gold-custom-kernelsu-susfstrue-8`
+(`boot.img` + AnyKernel3 zip + raw images + `SHA256SUMS.txt`).
+
+- Kernel side is verified by the pipeline itself: source pinned to `e56cf6b09cca`,
+  config read back **out of the built Image**, KMI list intact.
+- **Not flashed on hardware yet.** The first flash is the acceptance test — keep
+  your ROM's stock `boot.img`.
+- Two optional inputs make the first flash safer: `stock_boot_url` (copies
+  cmdline/os_version from your own boot.img) and `stock_symvers_url` (turns the
+  KMI gate into a hard CRC comparison against the stock build).
+
 ### Read before flashing
 
 - **[docs/FLASH.md](docs/FLASH.md)** — Hinglish step-by-step (backup, flash, rollback, dm-verity, troubleshooting). **Read this first.**
