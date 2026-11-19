@@ -8,7 +8,10 @@ name: Build GOLD custom kernel (android15-6.6, 4 KB, root + tweaks)
 # What makes it "custom":
 #   * root: KernelSU (default) or KernelSU-Next, built into the Image
 #   * SUSFS root hiding (susfs4ksu kernel + KernelSU patches, pinned as a pair)
-#   * tweaks: BBR + fq by default, MGLRU, WireGuard, NTFS3, all built in
+#   * tweaks: the whole list in configs/gold-features.config (schedutil/EAS/uclamp,
+#     cpusets, PSI, memcg, zram compression algos, MGLRU, ext4/F2FS/EROFS + inline
+#     crypto, mq-deadline, pstore/ramoops, WireGuard, exFAT, NTFS3, gamepad HID,
+#     BBR+fq default) - all built in, no module to push
 #   * kernel name suffixed "...-4k-gold" so a flashed build is identifiable
 #
 # Safety: CI only compiles and packages. Nothing is flashed. The boot.img is
@@ -33,9 +36,13 @@ on:
         type: boolean
         default: true
       tweaks:
-        description: "Performance tweaks (BBR+fq, MGLRU, WireGuard, NTFS3)"
+        description: "Feature set from configs/gold-features.config (schedutil/EAS/uclamp, PSI, zram algos, FS, pstore, extras)"
         type: boolean
         default: true
+      dev_build:
+        description: "Ftrace/perf development extras (configs/gold-devbuild.config) - debug builds only"
+        type: boolean
+        default: false
       ksu_ref:
         description: "Root repo ref/commit (empty = pinned known-good pair: KSU 64833c00)"
         type: string
@@ -88,6 +95,7 @@ env:
   ROOT_FLAVOR: ${{ inputs.root_flavor }}
   USE_SUSFS: ${{ inputs.use_susfs }}
   TWEAKS: ${{ inputs.tweaks }}
+  DEV_BUILD: ${{ inputs.dev_build }}
   KSU_REF: ${{ inputs.ksu_ref }}
   SUSFS_REF: ${{ inputs.susfs_ref }}
   CRC_STUB: ${{ inputs.crc_stub }}
@@ -188,8 +196,8 @@ jobs:
       - name: Align config with the stock gold kernel
         run: bash "$GITHUB_WORKSPACE/scripts/fix-gki-config.sh" "$GITHUB_WORKSPACE/gki"
 
-      - name: Apply performance tweaks
-        if: ${{ inputs.tweaks }}
+      - name: Apply the feature set (configs/gold-features.config)
+        if: ${{ inputs.tweaks || inputs.dev_build }}
         run: bash "$GITHUB_WORKSPACE/scripts/apply-tweaks.sh" "$GITHUB_WORKSPACE/gki"
 
       - name: Integrate root + SUSFS
@@ -225,6 +233,9 @@ jobs:
           export EFFECTIVE_USE_SUSFS="${EFFECTIVE_USE_SUSFS:-false}"
           export EFFECTIVE_USE_KPM="${EFFECTIVE_USE_KPM:-false}"
           bash "$GITHUB_WORKSPACE/scripts/verify-build.sh" "$GITHUB_WORKSPACE/gki"
+
+      - name: Policy gate (DO NOT INCLUDE contract)
+        run: bash "$GITHUB_WORKSPACE/scripts/check-policy.sh" "$GITHUB_WORKSPACE/gki" /tmp/built.config
 
       - name: KMI gate (prebuilt vendor modules must still resolve)
         run: |
@@ -279,7 +290,8 @@ jobs:
             echo "| GKI base | \`$COMMON_TAG\` = \`$EXPECTED_FULL_SHA\` (kernel $EXPECTED_VERSION, 4 KB pages) |"
             echo "| root | \`${EFFECTIVE_ROOT_FLAVOR:-none}\` (susfs=${EFFECTIVE_USE_SUSFS:-false}) |"
             echo "| rootsu sha | \`${KSU_SHA:-n/a}\` |"
-            echo "| tweaks | ${TWEAKS:-false} |"
+            echo "| tweaks | ${TWEAKS:-false} (configs/gold-features.config) |"
+            echo "| dev build | ${DEV_BUILD:-false} (ftrace/perf) |"
             echo "| crc stub | ${CRC_STUB:-false} |"
             echo "| artifacts | $(ls "$GITHUB_WORKSPACE/artifacts" 2>/dev/null | tr '\n' ' ') |"
             echo

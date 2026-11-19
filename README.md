@@ -22,7 +22,17 @@ The old Xiaomi `gold-s-oss` source is Android 13 / kernel 5.10 — **not** compa
 
 - **Root built into the kernel**: KernelSU (default, the fork SUSFS patches are maintained against) or KernelSU-Next — no Magisk-style patching needed.
 - **SUSFS** root hiding: the upstream pair (susfs4ksu + its `10_enable_susfs_for_ksu.patch`), both ends pinned to a coherent commit pair.
-- **Tweaks**: BBR + fq as default TCP congestion control, MGLRU, WireGuard, NTFS3 — all built in (`=y`), so nothing has to be pushed to a system partition.
+- **Feature set** (`configs/gold-features.config`, one reviewable list): schedutil +
+  EAS + uclamp + cpusets, PSI + memcg + MGLRU, zram compression backends (LZ4 /
+  LZ4-RLE / lzo-rle), ext4/F2FS/EROFS + inline encryption, mq-deadline, stock
+  thermal + cpuidle/suspend stats, WireGuard, exFAT, NTFS3, HID/gamepads,
+  pstore/ramoops, BBR + fq. All built in (`=y`) — no `.ko` to push.
+- **Runtime profiles** (`tools/gold-profiles.sh`, shipped in the artifact):
+  `balanced` / `gaming` / `sustained` / `charge-limit` — reversible, never a fixed
+  max clock or a fixed performance governor.
+- **[docs/FEATURES.md](docs/FEATURES.md)**: every requested item → where it actually
+  lives (Image config vs MediaTek vendor module vs runtime script) and how the
+  "do not include" list is machine-checked.
 - Kernel name ends in `-4k-gold`, so `uname -r` tells you a custom build is running.
 - Guard rails: stock config parity, in-image config verification, and a **KMI gate** so the prebuilt MediaTek vendor modules still load.
 
@@ -30,6 +40,7 @@ The old Xiaomi `gold-s-oss` source is Android 13 / kernel 5.10 — **not** compa
 
 Actions → **Build GOLD custom kernel (android15-6.6, 4 KB, root + tweaks)** → *Run workflow*.
 Defaults are the sensible ones (`kernelsu` + SUSFS + tweaks). A build takes ~40–70 min.
+`dev_build=true` adds ftrace/perf tracing (debug only, bigger Image).
 
 Artifacts: `boot.img` (fastboot), `AnyKernel3-*.zip` (rooted phone), raw `Image`/`Image.gz`, `SHA256SUMS.txt`.
 
@@ -51,6 +62,7 @@ Last full CI build: **run 44540769002 — green** (`main`, 2026-11-19, 22 min en
 
 - **[docs/FLASH.md](docs/FLASH.md)** — Hinglish step-by-step (backup, flash, rollback, dm-verity, troubleshooting). **Read this first.**
 - **[docs/BUILD.md](docs/BUILD.md)** — every workflow input, what each step does, how to read failure annotations.
+- **[docs/FEATURES.md](docs/FEATURES.md)** — the feature map: what is in the Image, what is vendor-side, what is refused (and which gate enforces it).
 - **[docs/RESEARCH.md](docs/RESEARCH.md)** — the device facts and config rules behind the design.
 
 > Custom kernel + unlocked bootloader = your responsibility. Keep a stock `boot.img`

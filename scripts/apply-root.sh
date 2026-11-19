@@ -59,6 +59,20 @@ if [ "$ROOT_FLAVOR" = "none" ]; then
     exit 0
 fi
 
+# ------------------------------------------------------- patch path manifest
+# check-policy.sh needs to know which files are modified by the *vendored*
+# upstream patches (SUSFS/root) vs by us. Without that, a legitimate hunk in,
+# say, mm/ would look like a policy violation. Every patch we apply records the
+# files it touches here, and the policy gate treats those as "reviewed upstream".
+PATCH_MANIFEST="${PATCH_MANIFEST:-/tmp/gold-patch-paths.txt}"
+: >"$PATCH_MANIFEST"
+record_patch() { # record_patch <patch-file>
+    grep -E '^\+\+\+ ' "$1" 2>/dev/null \
+        | sed -E -e 's/^\+\+\+ +//' -e 's/\t.*$//' -e 's/^[ab]\///' \
+        | grep -v '^/dev/null$' >>"$PATCH_MANIFEST" || true
+    echo "    recorded $(grep -c . "$PATCH_MANIFEST" || true) patched path(s) for the policy gate"
+}
+
 # ---------------------------------------------------- flavor/SUSFS compatibility
 if [ "$ROOT_FLAVOR" = "ksu-next" ] && [ "$USE_SUSFS" = "true" ]; then
     echo "::warning::KernelSU-Next only has SUSFS as a loadable module (not in-tree);"
@@ -178,9 +192,12 @@ if [ "$USE_SUSFS" = "true" ]; then
     # kernel side: fs/susfs.c, include/linux/susfs{,_def}.h, hooks in fs/*, mm/*, ...
     cp -f "$SUS"/kernel_patches/fs/* "$KDIR/fs/"
     cp -f "$SUS"/kernel_patches/include/linux/* "$KDIR/include/linux/"
+    for f in "$SUS"/kernel_patches/fs/*; do echo "fs/$(basename "$f")" >>"$PATCH_MANIFEST"; done
+    for f in "$SUS"/kernel_patches/include/linux/*; do echo "include/linux/$(basename "$f")" >>"$PATCH_MANIFEST"; done
     KPATCH="$SUS/kernel_patches/50_add_susfs_in_${SUSFS_BRANCH}.patch"
     [ -f "$KPATCH" ] || { echo "::error::missing $KPATCH"; exit 1; }
     patch -p1 -d "$KDIR" <"$KPATCH" || { echo "::error::SUSFS kernel patch failed to apply"; exit 1; }
+    record_patch "$KPATCH"
     echo "    kernel-side patch applied"
 
     # root side: supercall dispatch + KSU_SUSFS* Kconfig, maintained against
