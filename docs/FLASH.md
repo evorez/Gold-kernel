@@ -181,3 +181,34 @@ Root check:
 adb shell su -c id
 # uid=0(root) aana chahiye (manager me grant karne ke baad)
 ```
+
+Feature check (kernel side, bina root ke bhi):
+```bash
+adb shell 'zcat /proc/config.gz | grep -E "WIREGUARD|NTFS3|EXFAT|LRU_GEN|PSI=|SCHEDUTIL"'
+adb shell 'ls /sys/fs/pstore'          # pstore/ramoops mount
+adb shell 'cat /sys/power/suspend_stats/success'
+```
+
+---
+
+## 8. Runtime profiles (root ke baad, optional)
+
+Kernel me koi fixed performance policy nahi hai — balanced/gaming/sustained
+**runtime** profiles hain, aur har value reversible hai:
+
+```bash
+adb push gold-profiles.sh /data/local/tmp/          # artifact ke andar milta hai
+adb shell su -c 'sh /data/local/tmp/gold-profiles.sh status'
+adb shell su -c 'sh /data/local/tmp/gold-profiles.sh gaming'      # freq ramp-up + top-app uclamp
+adb shell su -c 'sh /data/local/tmp/gold-profiles.sh sustained'   # ~80% max freq cap (heat/battery)
+adb shell su -c 'sh /data/local/tmp/gold-profiles.sh balanced'    # wapas stock-like
+adb shell su -c 'sh /data/local/tmp/gold-profiles.sh charge-limit 80'
+adb shell su -c 'sh /data/local/tmp/gold-profiles.sh restore'     # snapshot se sab wapas
+```
+
+- Governor `schedutil` ke alawa kuch bhi ho to script **mana** kar deti hai
+  (refuse), thermal zones/trips ko ye script kabhi touch nahi karti.
+- Backup `/data/adb/gold-profiles/backup` me rehta hai; `restore` wahi wapas likhta hai.
+- Charge limit sirf tab kaam karti hai jab aapke ROM ka vendor charger driver
+  percentage node expose kare (`charge_control_end_threshold`); warna script saaf
+  saaf bol deti hai ki kuch nahi likha — guess karke current node nahi chhedta.

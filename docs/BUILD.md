@@ -12,7 +12,8 @@ KMI + package <1 min). Budget up to 60 min if the runner is slow.
 |---|---|---|
 | `root_flavor` | `kernelsu` | `kernelsu` (tiann/KernelSU — required for SUSFS), `ksu-next` (KernelSU-Next v3.4.x), `none` (no root) |
 | `use_susfs` | `true` | SUSFS root hiding: susfs4ksu kernel patch **and** its `10_enable_susfs_for_ksu.patch`. Redirected to `kernelsu` when `ksu-next` is chosen (Next only has SUSFS as an LKM). |
-| `tweaks` | `true` | BBR + fq as default congestion control, MGLRU, WireGuard, NTFS3 — all built in (`=y`) |
+| `tweaks` | `true` | The feature set of `configs/gold-features.config` (schedutil/EAS/uclamp, PSI, memcg, MGLRU, zram algos, ext4/F2FS/EROFS + inline crypto, mq-deadline, pstore, WireGuard, exFAT, NTFS3, HID, BBR+fq) — all built in (`=y`) |
+| `dev_build` | `false` | Adds `configs/gold-devbuild.config` (ftrace, dynamic ftrace, kprobe events, perf). Debug only: bigger Image, extra symbols. |
 | `ksu_ref` | *(empty)* | Pin the root repo. Empty = the verified pin (`64833c00` for KernelSU, `v3.4.2` for Next). |
 | `susfs_ref` | `f98f0822` | susfs4ksu commit on branch `gki-android15-6.6`. Its commit message names KernelSU `64833c00` as the synced upstream — the two pins must stay a coherent pair. |
 | `crc_stub` | `false` | Patch `check_version()` to skip genksyms CRC comparison. Use **only** if vendor modules complain at boot. |
@@ -31,7 +32,10 @@ KMI + package <1 min). Budget up to 60 min if the runner is slow.
    LTO stays `NONE`, CFI stays on, `MODVERSIONS=y`, KPROBES/KALLSYMS on, protected
    export lists removed, `check_defconfig` gate disabled, kernel name suffixed
    `-4k-gold`.
-3. **Tweaks** (`scripts/apply-tweaks.sh`) — built-in only, no `.ko` to push.
+3. **Feature set** (`scripts/apply-tweaks.sh` + `configs/gold-features.config`,
+   `configs/gold-devbuild.config` when `dev_build=true`) — a fragment of `REQ`/`OPT`
+   lines is applied to `gki_defconfig`; built-in only, no `.ko` to push. Per-item
+   mapping (Image vs MediaTek vendor module vs runtime script): `docs/FEATURES.md`.
 4. **Root + SUSFS** (`scripts/apply-root.sh`) — clones KernelSU / KernelSU-Next,
    wires `drivers/kernelsu`, runs a 1-second static coherence preflight (catches
    upstream breakage before the 20-minute compile), applies **both** susfs4ksu
@@ -42,13 +46,22 @@ KMI + package <1 min). Budget up to 60 min if the runner is slow.
 6. **Verify** (`scripts/verify-build.sh`) — reads the config **back out of the
    Image** (`IKCONFIG`) and asserts 4 KB pages, `LTO_NONE`, `CFI_CLANG`,
    `MODVERSIONS`, `MODULE_SIG_PROTECT` off, `KSU`/`KSU_SUSFS` when requested, and
-   the tweaks; asserts the version string is `6.6.118-...-android15-8`.
+   every `REQ` line of the feature fragment (`OPT` ones only warn, so an option the
+   kernel does not offer is visible on the run page instead of failing it); asserts
+   the version string is `6.6.118-...-android15-8`.
+6b. **Policy gate** (`scripts/check-policy.sh`) — enforces the do-not-include list:
+   no changes under `drivers/{thermal,gpu,cpufreq,devfreq,opp,clk}`, `block`, `mm`,
+   `net`, `kernel/{sched,power}`, `arch/arm64/boot` (unless the file comes from a
+   vendored SUSFS/root patch, which is reported as a warning); no added line that
+   mentions `fsync`, thermal bypass or permissive SELinux; in the Image, SELinux on,
+   no performance/userspace-default governor, no writable thermal trips.
 7. **KMI gate** (`scripts/check-kmi.sh`) — every symbol of
    `android/abi_gki_aarch64` must still be exported, and (when a reference
    `Module.symvers` is supplied) every shared symbol must have an identical CRC.
    This is the check that prevents "compiles fine, black screen on boot".
 8. **Package** (`scripts/package.sh`) — `boot.img` (header v4, kernel only),
-   `AnyKernel3-*.zip`, raw `Image`/`Image.gz`, `NOTES.txt`, `SHA256SUMS.txt`.
+   `AnyKernel3-*.zip`, raw `Image`/`Image.gz`, `NOTES.txt`, `SHA256SUMS.txt`, plus
+   `gold-profiles.sh` and `FEATURES.md` so the runtime profiles travel with the build.
 
 ## Artifacts
 

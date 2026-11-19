@@ -165,6 +165,12 @@ if has image; then
     echo "==> raw kernel: Image-$BASE / Image-$BASE.gz"
 fi
 
+# ------------------------------------------------------- runtime tools + docs
+for f in "$SCRIPT_DIR/../tools/gold-profiles.sh" "$SCRIPT_DIR/../docs/FEATURES.md"; do
+    [ -f "$f" ] && cp -f "$f" "$OUTDIR/" && echo "==> shipped $(basename "$f")"
+done
+chmod +x "$OUTDIR/gold-profiles.sh" 2>/dev/null || true
+
 # ------------------------------------------------------------------- notes
 {
     echo "gold custom kernel - $KVER"
@@ -184,6 +190,11 @@ fi
     echo "verification once with your ROM's vbmeta:"
     echo "  fastboot --disable-verity --disable-verification flash vbmeta vbmeta.img"
     echo
+    echo "Runtime profiles (after root):"
+    echo "  adb push gold-profiles.sh /data/local/tmp/ && adb shell su -c 'sh /data/local/tmp/gold-profiles.sh gaming'"
+    echo "  gold-profiles.sh {status|balanced|gaming|sustained|charge-limit 80|restore}"
+    echo
+    echo "Feature map: FEATURES.md (what is in the Image, what is vendor-side, what is refused)."
     echo "Read docs/FLASH.md (Hinglish) before the first flash."
 } >"$OUTDIR/NOTES.txt"
 
