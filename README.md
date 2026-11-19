@@ -1,6 +1,11 @@
-# Gold-kernel
+# GoldenEra — custom kernel for the Redmi Note 13 5G (gold)
 
+**GoldenEra v1** · author **@Evorez** 🥹
 Custom-kernel workspace for the **Xiaomi Redmi Note 13 5G** (codename **gold**), driven from GitHub Actions (no PC required — only a phone with a browser).
+
+- Release history / bisection ladder: [`docs/CHANGELOG.md`](docs/CHANGELOG.md)
+- Bootloop diagnosis: [`docs/BOOTLOOP.md`](docs/BOOTLOOP.md)
+- Flash guide (Hinglish): [`docs/FLASH.md`](docs/FLASH.md)
 
 Two workflows, in the order they should be used:
 
@@ -33,7 +38,7 @@ The old Xiaomi `gold-s-oss` source is Android 13 / kernel 5.10 — **not** compa
 - **[docs/FEATURES.md](docs/FEATURES.md)**: every requested item → where it actually
   lives (Image config vs MediaTek vendor module vs runtime script) and how the
   "do not include" list is machine-checked.
-- Kernel name ends in `-4k-gold`, so `uname -r` tells you a custom build is running.
+- Kernel name ends in `-4k-golden` (GoldenEra), so `uname -r` tells you a custom build is running.
 - Guard rails: stock config parity, in-image config verification, and a **KMI gate** so the prebuilt MediaTek vendor modules still load.
 
 ### Run it
@@ -58,7 +63,7 @@ to keep and the easiest one to download on the phone.
 (see below). Published by run `44579469714` with `publish_release=true`.
 
 Last full CI build: **run 44579469714 — green** (`main`, 2026-11-19, 24 min end to
-end, ~11 min of that is Bazel). Artifact: `gold-custom-kernelsu-susfstrue-11`.
+end, ~11 min of that is Bazel). Artifact: `GoldenEra-kernelsu-susfstrue-11`.
 
 - The pipeline verifies its own output: source pinned to `e56cf6b09cca`, the config
   read back **out of the built Image** satisfied all **48 required** feature options

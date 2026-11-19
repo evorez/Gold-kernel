@@ -109,7 +109,7 @@ structure + permissions check karta hai.
 1. Zip phone/SD card ya USB-OTG me rakho.
 2. Recovery me boot karo → **Install** → `AnyKernel3-*.zip` chuno → swipe to confirm.
 3. Script khud: current slot detect → `boot` split → **sirf kernel** replace → repack →
-   flash. Screen par `Installing gold-custom …` phir `Done` dikhega.
+   flash. Screen par `Installing GoldenEra …` phir `Done` dikhega.
 4. Reboot to system.
 
 **Tarika 2 — KernelFlasher app (recovery ki zaroorat nahi, root chahiye):**
@@ -126,7 +126,7 @@ raha to flash abort hoga — tab **2C** (ready-made `boot.img`, fastboot se) use
 ### Recovery se flash ke baad check
 
 ```bash
-adb shell uname -r     # …-4k-gold dikhna chahiye
+adb shell uname -r     # …-4k-golden dikhna chahiye
 ```
 
 ## 2B. Optional: khud `boot.img` banana (advanced)
@@ -141,7 +141,7 @@ unpack_bootimg --boot_img stock-boot.img --out stock/
 
 # 2) humara kernel daal ke repack karo (values stock se hi lo)
 mkbootimg --header_version 4 \
-  --kernel Image-gold-custom-*.gz \
+  --kernel Image-GoldenEra-*.gz \
   --cmdline "bootopt=64S3,32N2,64N2" \
   --os_version 16.0.0 --os_patch_level 2026-01 \
   --output boot.img
@@ -233,7 +233,7 @@ zaroorat nahi) — isliye stock boot.img ka hona hi sabse bada insurance hai.
 ```bash
 adb shell uname -r
 # 6.6.118-android15-8-g<sha>-ab...
-# ...-4k-gold par khatam hona chahiye (humara custom suffix)
+# ...-4k-golden par khatam hona chahiye (humara custom suffix)
 ```
 
 Root check:

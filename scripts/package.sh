@@ -24,7 +24,7 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 DIST="${DIST:-}"
 OUTDIR="${OUTDIR:-$PWD/artifacts}"
-KERNEL_NAME="${KERNEL_NAME:-gold-custom}"
+KERNEL_NAME="${KERNEL_NAME:-GoldenEra}"
 FORMATS="${FORMATS:-anykernel,image}"
 STOCK_BOOT="${STOCK_BOOT:-}"
 VENDOR_BOOT="${VENDOR_BOOT:-}"
@@ -193,8 +193,10 @@ chmod +x "$OUTDIR/gold-profiles.sh" 2>/dev/null || true
 
 # ------------------------------------------------------------------- notes
 {
-    echo "gold custom kernel - $KVER"
-    echo "built: $(date -u +%Y-%m-%dT%H:%M:%SZ)"
+    echo "GoldenEra v1 - custom kernel for the Redmi Note 13 5G (gold)"
+    echo "author: @Evorez"
+    echo "kernel: $KVER"
+    echo "built:  $(date -u +%Y-%m-%dT%H:%M:%SZ)"
     echo "root flavor: ${EFFECTIVE_ROOT_FLAVOR:-none} (susfs=${EFFECTIVE_USE_SUSFS:-false})"
     echo "ksu: ${KSU_SHA:-n/a}"
     echo

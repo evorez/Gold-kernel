@@ -1,7 +1,7 @@
 # Bootloop diagnosis (r14 ke baad)
 
 r14 recovery zip `boot_b` par flash hua — device check `gold` pass, log me
-`Installing gold-custom 6.6.118-android15-8-maybe-dirty-4k-gold … Done` bhi aaya —
+`Installing GoldenEra 6.6.118-android15-8-maybe-dirty-4k-golden-gold … Done` bhi aaya —
 par phone **bootloop** kar gaya aur stock boot wapas flash karne par thik hua.
 Matlab: flash theek tha, kernel userspace tak nahi pahuncha.
 
@@ -13,7 +13,7 @@ Matlab: flash theek tha, kernel userspace tak nahi pahuncha.
 2. **Source sha** — build `android15-6.6-2026-01_r34` (`e56cf6b09cca…`, 6.6.118)
    se, jo stock ke `uname -r` me bhi hai.
 3. **Vermagic ka release string** — `CONFIG_MODVERSIONS=y` hone par kernel
-   release string ko match *nahi* karta, sirf flags. Isliye `-4k-gold` suffix
+   release string ko match *nahi* karta, sirf flags. Isliye `-4k-golden` suffix
    apne aap me vendor modules reject nahi kara sakta.
 
 ## Stock config (aapki boot.img se nikaala gaya)
