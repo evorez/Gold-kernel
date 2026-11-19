@@ -5,9 +5,10 @@
 # for the ftrace/perf extras). This script only *applies* it - it never invents
 # options, so what the kernel ends up with is reviewable in one file.
 #
-# Why configs and not modules: the only thing a user flashes is boot.img. A .ko
-# shipped in the artifact would never be loaded (it would need signing and a push
-# to vendor_dlkm), so anything that must be present has to be linked in.
+# Why configs and not modules: the artifact is the kernel Image (packed into a boot
+# image by the user, or swapped in place by the AnyKernel3 zip). A .ko shipped in
+# the artifact would never be loaded (it would need signing and a push to
+# vendor_dlkm), so anything that must be present has to be linked in.
 #
 # KMI safety: nothing here adds, removes or retypes an exported symbol. These are
 # new code paths behind configs, so the prebuilt MediaTek modules keep their CRCs.

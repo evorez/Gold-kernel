@@ -13,11 +13,12 @@ name: Build GOLD custom kernel (android15-6.6, 4 KB, root + tweaks)
 #     crypto, mq-deadline, pstore/ramoops, WireGuard, exFAT, NTFS3, gamepad HID,
 #     BBR+fq default) - all built in, no module to push
 #   * kernel name suffixed "...-4k-gold" so a flashed build is identifiable
+#   * deliverables are the kernel itself: Image, Image.gz, AnyKernel3 zip
 #
-# Safety: CI only compiles and packages. Nothing is flashed. The boot.img is
-# built with the same header shape as gold's stock boot partition (v4, kernel
-# only, no ramdisk) - but a custom kernel ALWAYS needs a stock boot.img kept
-# aside for rollback. Read docs/FLASH.md before flashing.
+# Safety: CI only compiles and packages. Nothing is flashed, and no boot.img is
+# packed - the deliverable is the kernel (Image, Image.gz, AnyKernel3 zip). A
+# custom kernel ALWAYS needs a stock boot.img kept aside for rollback. Read
+# docs/FLASH.md before flashing.
 #
 # Diagnostics: run logs are not retrievable via the API from all environments, so
 # risky steps echo their most useful lines as ::error:: annotations (readable via
@@ -63,10 +64,6 @@ on:
         description: "Extra defconfig lines, one per row (e.g. CONFIG_FOO=y)"
         type: string
         default: ""
-      stock_boot_url:
-        description: "Direct URL to your ROM's boot.img (optional, improves header accuracy)"
-        type: string
-        default: ""
       stock_symvers_url:
         description: "Direct URL to a reference Module.symvers (optional, enables hard CRC check)"
         type: string
@@ -75,11 +72,10 @@ on:
         description: "Artifacts to package"
         type: choice
         options:
-          - "bootimg,anykernel,image"
-          - "bootimg,image"
           - "anykernel,image"
           - "image"
-        default: "bootimg,anykernel,image"
+          - "anykernel"
+        default: "anykernel,image"
 
 concurrency:
   group: gold-custom-${{ github.ref }}
@@ -105,7 +101,6 @@ env:
   SUSFS_REF: ${{ inputs.susfs_ref }}
   CRC_STUB: ${{ inputs.crc_stub }}
   EXTRA_CONFIG: ${{ inputs.extra_config }}
-  STOCK_BOOT_URL: ${{ inputs.stock_boot_url }}
   STOCK_SYMVERS_URL: ${{ inputs.stock_symvers_url }}
   FORMATS: ${{ inputs.formats }}
 
@@ -259,23 +254,6 @@ jobs:
           fi
           bash "$GITHUB_WORKSPACE/scripts/check-kmi.sh" "$GITHUB_WORKSPACE/gki" "$REF"
 
-      - name: Fetch a stock boot.img (optional, for exact header values)
-        if: ${{ inputs.stock_boot_url != '' }}
-        run: |
-          set +e
-          curl -fL --retry 3 "$STOCK_BOOT_URL" -o "$GITHUB_WORKSPACE/stock-boot.img"
-          rc=$?
-          size=$(stat -c%s "$GITHUB_WORKSPACE/stock-boot.img" 2>/dev/null || echo 0)
-          magic=$(head -c 8 "$GITHUB_WORKSPACE/stock-boot.img" 2>/dev/null)
-          if [ $rc -ne 0 ] || [ "$magic" != "ANDROID!" ] || [ "$size" -lt 1000000 ]; then
-            echo "::warning::stock_boot_url did not yield a valid boot.img (rc=$rc, size=$size, magic=$magic)."
-            echo "::warning::Falling back to gold's BOARD_MKBOOTIMG_ARGS defaults."
-            rm -f "$GITHUB_WORKSPACE/stock-boot.img"
-          else
-            echo "::notice::stock boot.img downloaded ($size bytes)"
-            python3 "$GITHUB_WORKSPACE/scripts/bootimg.py" inspect "$GITHUB_WORKSPACE/stock-boot.img"
-          fi
-
       - name: Show dist contents
         run: find "$GITHUB_WORKSPACE/dist" -type f | sort | sed 's/^/    /'
 
@@ -283,7 +261,6 @@ jobs:
         run: |
           export DIST="$GITHUB_WORKSPACE/dist"
           export OUTDIR="$GITHUB_WORKSPACE/artifacts"
-          export STOCK_BOOT="$GITHUB_WORKSPACE/stock-boot.img"
           export KERNEL_NAME FORMATS
           bash "$GITHUB_WORKSPACE/scripts/package.sh"
 
@@ -302,7 +279,7 @@ jobs:
             echo "| crc stub | ${CRC_STUB:-false} |"
             echo "| artifacts | $(ls "$GITHUB_WORKSPACE/artifacts" 2>/dev/null | tr '\n' ' ') |"
             echo
-            echo "Rollback needs a stock \`boot.img\` for your ROM. Read \`docs/FLASH.md\` (Hinglish) first."
+            echo "Kernel only - no boot.img is packed. Rollback needs your ROM's stock \`boot.img\`. Read \`docs/FLASH.md\` (Hinglish) first."
           } >>"$GITHUB_STEP_SUMMARY"
 
       - name: Upload artifacts
@@ -323,7 +300,7 @@ jobs:
           TITLE="gold custom kernel r${{ github.run_number }} (${COMMON_TAG:-android15-6.6}, ${EFFECTIVE_ROOT_FLAVOR:-none})"
           NOTES="Built from \`${EXPECTED_FULL_SHA}\` (\`${COMMON_TAG}\`, kernel ${EXPECTED_VERSION}, 4 KB pages).
           root=${EFFECTIVE_ROOT_FLAVOR:-none}, susfs=${EFFECTIVE_USE_SUSFS:-false}, tweaks=${TWEAKS:-false}, dev_build=${DEV_BUILD:-false}.
-          **Not hardware-tested yet** - keep your ROM's stock boot.img. Flash guide: docs/FLASH.md."
+          Kernel only (Image / Image.gz / AnyKernel3 zip, no boot.img). **Not hardware-tested yet** - keep your ROM's stock boot.img. Install guide: docs/FLASH.md."
           if gh release view "$TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
             echo "release $TAG already exists - uploading assets into it"
           else

@@ -40,8 +40,8 @@ Consequences:
 - **No `init_boot` partition.** The ramdisk lives inside `vendor_boot`
   (`init_boot.cpio` is gold's fallback ramdisk). That is why rooting guides for
   this device patch `vendor_boot`, not `boot`.
-- `boot` carries **kernel only** → a custom kernel is one `boot.img`, and nothing
-  else has to be rebuilt or re-signed.
+- `boot` carries **kernel only** → swapping the kernel needs no other image
+  rebuilt or re-signed (`vendor_boot` holds the ramdisk and stays as it is).
 - Header v3/v4 use a fixed 4096-byte page for the header/kernel layout, and no
   kernel/ramdisk load addresses are stored, so `--base`/`--*_offset` do not matter
   here (they are kept in the device tree for the vendor_boot image).
@@ -96,14 +96,17 @@ too, unless `crc_stub=true` is explicitly chosen.
 
 ## 5. Packaging
 
-- `mkbootimg` (vendored AOSP `scripts/mkbootimg.py`) builds a header-v4 image with
-  the kernel only, 4096-byte pages, `cmdline bootopt=64S3,32N2,64N2`,
-  `os_version 16.0.0`, `os_patch_level 2026-01`. If `stock_boot_url` is given,
-  cmdline/os_version/patch level are copied from that image's header instead.
-- AnyKernel3 (`osm0sis/AnyKernel3`) zip is the root-friendly alternative: it
-  unpacks the *on-device* `boot.img`, swaps the kernel and repacks, so whatever
-  the ROM put in the header/dtb stays intact.
-- No AVB footer and no GKI boot signature are added: verification will fail on a
+- **This project does not pack a `boot.img`.** The deliverable is the kernel:
+  `Image`, `Image.gz`, plus an AnyKernel3 zip. Reason: a boot image needs a
+  header/cmdline *and*, on gold, a dtb; a wrong guess produces a non-booting phone
+  and there is no way to verify the guess without the ROM's own `boot.img`.
+- AnyKernel3 (`osm0sis/AnyKernel3`) zip does the safe version of the same job: it
+  unpacks the *on-device* `boot.img`, swaps only the kernel and repacks, so whatever
+  the ROM put in the header/dtb/ramdisk stays byte-identical. `vendor_boot` is
+  untouched.
+- If the user wants a fastboot-flashable image they build it themselves from
+  `Image.gz` + their own stock boot.img as the reference (`docs/FLASH.md`, 2B).
+- No AVB footer and no GKI boot signature are involved: verification will fail on a
   locked/verified device, which is expected — flash with verification disabled
   (see FLASH.md).
 

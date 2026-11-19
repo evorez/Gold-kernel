@@ -1,38 +1,41 @@
-# Flash karne ki guide (Hinglish) — gold custom kernel
+# Install karne ki guide (Hinglish) — gold custom kernel
 
-> **Pehle ye padh lo:** custom kernel flash karna = apni zimmedari. Bootloader
-> unlocked hona chahiye. Ek **stock boot.img** zaroor rakhna, warna bootloop me
-> phone fastboot se hi theek hoga. Data wipe ki zaroorat nahi hoti, par backup
-> rakhna achhi aadat hai.
+> **Pehle ye padh lo:** custom kernel install karna = apni zimmedari. Bootloader
+> unlocked hona chahiye. Apne ROM ka **stock `boot.img`** zaroor sambhal ke rakho —
+> wo hi rollback hai. Data wipe ki zaroorat nahi hoti, par backup achhi aadat hai.
 
 Ye guide **Redmi Note 13 5G (codename `gold`)** ke liye hai, Android 16 / HyperOS 3
 ya gold ke kisi custom ROM ke saath. Device ki shakal:
 
 ```
-boot        = sirf kernel (header v4, ramdisk 0, Image.gz)   <-- hum yahi badalte hain
+boot        = sirf kernel (header v4, ramdisk 0, Image.gz)   <-- sirf kernel badalta hai
 vendor_boot = dtb + vendor ramdisk (modules)
 vendor_dlkm = MediaTek ke prebuilt modules
 init_boot   = is device par hai hi nahi
 ```
 
-Iska matlab: **sirf `boot.img` flash karna hai**. `vendor_boot`, `vbmeta`, `dtbo`
-ko haath mat lagao — humne unhe touch hi nahi kiya hai.
+**Hum `boot.img` nahi dete — sirf kernel dete hain** (`Image`, `Image.gz`, aur ek
+AnyKernel3 zip). Wajah: boot.img banane ka matlab header/cmdline aur (gold par) dtb
+guess karna, aur galat guess ka result non-booting phone hai. Iske bajaye:
+
+- **AnyKernel3 zip** aapke phone ke *existing* boot ko split karta hai aur sirf kernel
+  swap karta hai — aapka stock header/dtb/ramdisk bilkul waisa hi rehta hai.
+- Agar aapko khud boot.img chahiye, to neeche 2B dekho (apne stock boot ko reference
+  rakh ke banega, andaza nahi).
 
 ---
 
-## 0. Ek nazar me (TL;DR)
+## 0. Ek nazar me (TL;DR) — rooted phone
 
 ```bash
-# 1) phone fastboot me
-adb reboot bootloader
-
-# 2) check
-fastboot devices          # serial dikhna chahiye
-
-# 3) flash (artifacts se boot.img)
-fastboot flash boot boot.img
-fastboot reboot
+# zip phone me daalo
+adb push AnyKernel3-*.zip /sdcard/Download/
 ```
+
+1. Phone pe **KernelFlasher** app (ya koi recovery) kholo.
+2. `AnyKernel3-*.zip` chuno → flash → reboot.
+
+Bas. `vendor_boot` / `vbmeta` / `dtbo` ko haath nahi lagta.
 
 Rollback (agar kuch gadbad ho):
 
@@ -48,9 +51,10 @@ fastboot reboot
 | Cheez | Kyun | Kahan se |
 |---|---|---|
 | Unlocked bootloader | bina iske flash reject hoga | Settings → Developer options → OEM unlocking + Mi Unlock |
-| `boot.img` (humara artifact) | custom kernel | GitHub Actions run ka artifact |
-| **`stock-boot.img`** | rollback ka sahara | apne ROM ke zip ke andar se (neeche dekho) |
-| PC/laptop + USB cable | fastboot | — |
+| Root (KernelSU manager) | AnyKernel3 zip ke liye (app flash karta hai) | pehle se root ho to ho gaya; nahi to pehle koi bhi root method |
+| `AnyKernel3-*.zip` | kernel install | GitHub Release (`gold-r*`) ya Actions artifact |
+| raw `Image-*` / `Image-*.gz` | agar khud boot.img banana ho (2B) | wahi release |
+| **`stock-boot.img`** | rollback ka sahara + 2B ke liye reference | apne ROM ke zip se (neeche) |
 | `platform-tools` | `adb`, `fastboot` | developer.android.com/tools/releases/platform-tools |
 | 50-60% battery | safe flash | — |
 
@@ -75,23 +79,47 @@ payload-dumper-go -p boot payload.bin    # boot.img niklega
 su -c 'dd if=/dev/block/by-name/boot of=/sdcard/stock-boot.img'
 ```
 
-> `boot.img` sirf ~30-60 MB ka hota hai, isliye Google Drive/Telegram par rakhna
-> aasan hai. Isko **kabhi delete mat karna**.
+> Isko **kabhi delete mat karna** — bootloop me yahi bachata hai.
 
 ---
 
-## 2. Flash (fastboot, sabse reliable tarika)
+## 2A. Install: AnyKernel3 zip (recommended)
+
+1. `AnyKernel3-*.zip` phone me copy karo.
+2. **KernelFlasher** app (FatalBullet) → "Flash kernel / AK3 zip" → zip chuno.
+   Recovery se bhi ho sakta hai (TWRP: Install → zip).
+3. App khud `boot` partition unpack → sirf kernel replace → repack karta hai.
+   Isliye aapke ROM ka header/dtb/ramdisk jaisa tha waisa hi rehta hai.
+4. Reboot. Pehla boot **2-5 minute** le sakta hai (ART dobara compile hota hai).
+
+Zip khud verify karta hai: galat device par `device.name` check fail hoga, aur
+`vendor_boot` touch hi nahi hota.
+
+## 2B. Optional: khud `boot.img` banana (advanced)
+
+Agar aap fastboot se hi flash karna chahte ho, boot image khud banao — par **apne
+stock boot ko reference** rakh ke, andaze se nahi:
 
 ```bash
-adb reboot bootloader
-fastboot devices
-fastboot flash boot boot.img
-# output me "OKAY" aana chahiye
-fastboot reboot
+# 1) stock boot se header ki values dekho (base, pagesize, cmdline, dtb)
+#    AOSP ke mkbootimg/unpack_bootimg, ya kisi bhi boot.img inspector se
+unpack_bootimg --boot_img stock-boot.img --out stock/
+
+# 2) humara kernel daal ke repack karo (values stock se hi lo)
+mkbootimg --header_version 4 \
+  --kernel Image-gold-custom-*.gz \
+  --cmdline "bootopt=64S3,32N2,64N2" \
+  --os_version 16.0.0 --os_patch_level 2026-01 \
+  --output boot.img
 ```
 
-Pehla boot **2-5 minute** le sakta hai (dalvik/ART dobara compile hota hai).
-Ghabrana nahi.
+Do baatein dhyan me rakho:
+- Agar stock boot me **dtb** hai (`unpack_bootimg` ke output me `dtb` file), to usko
+  `--dtb stock/dtb` se saath do — warna boot fail ho sakta hai.
+- Humari build ka kernel version `6.6.118-android15-8` hona chahiye
+  (`strings Image-* | grep 'Linux version'`), warna vendor modules load nahi honge.
+
+Isi wajah se **2A (AnyKernel3) default recommendation hai** — usme ye guess-work hi nahi hai.
 
 ### Agar phone "dm-verity / device is corrupt" dikhaye
 
@@ -127,17 +155,14 @@ patching nahi karna. Sirf manager app chahiye:
 
 ---
 
-## 4. AnyKernel3 zip (rooted phone, bina PC)
+## 4. Recovery se flash (KernelFlasher ke bina)
 
-Agar phone already rooted hai:
-
-1. `AnyKernel3-*.zip` ko phone me copy karo.
-2. **KernelFlasher** app (FatalBullet) kholo → "Flash kernel / AK3 zip" → zip chuno.
-3. App khud `boot` partition unpack → kernel replace → repack karta hai, isliye
-   tumhare ROM ka dtb/header jaisa hai waisa hi rehta hai.
+1. `AnyKernel3-*.zip` ko phone/SD card me rakho.
+2. Recovery (TWRP / stock recovery with sideload) me boot karo.
+3. Install → zip chuno (ya `adb sideload AnyKernel3-*.zip`).
 4. Reboot.
 
-Isme `vendor_boot` bhi touch nahi hota.
+Same zip, same kaam — sirf tool alag hai. `vendor_boot` yahan bhi touch nahi hota.
 
 ---
 
@@ -145,7 +170,7 @@ Isme `vendor_boot` bhi touch nahi hota.
 
 | Lakshan | Matlab | Fix |
 |---|---|---|
-| Logo par atka, boot nahi | kernel/ROM mismatch ya galat header | stock boot.img flash karo, `stock_boot_url` de ke dobara build |
+| Logo par atka, boot nahi | kernel/ROM mismatch, ya khud banaye boot.img me header/dtb galat | stock boot.img flash karo; phir AnyKernel3 zip (2A) se install karo — usme header/dtb guess nahi hota |
 | Black screen, phone vibrate karta hai | vendor modules load nahi hue (KMI/CRC) | stock boot wapas; build me `crc_stub=true` try karo, ya `stock_symvers_url` de ke CRC check chalao |
 | WiFi/BT band | `MODULE_SIG_PROTECT` ya protected-exports issue | humne already off rakha hai; dmesg me `module verification failed` dekho |
 | "dm-verity / corrupt" | AVB hash mismatch | section 2 ka `vbmeta` command |
@@ -164,6 +189,7 @@ zaroorat nahi) — isliye stock boot.img ka hona hi sabse bada insurance hai.
 - `fastboot flashing lock` jab tak 100% stock na ho jao (lock karne se pehle
   stock boot + vbmeta wapas).
 - Purane/dusre ROM ka `boot.img` apne ROM par flash karna (KMI mismatch).
+- Khud banaye boot.img me stock ka dtb bhool jana (section 2B) — pehla boot fail hoga.
 - Battery 30% se neeche flash karna.
 
 ---

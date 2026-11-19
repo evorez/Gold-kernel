@@ -42,7 +42,9 @@ Actions → **Build GOLD custom kernel (android15-6.6, 4 KB, root + tweaks)** �
 Defaults are the sensible ones (`kernelsu` + SUSFS + tweaks). A build takes ~40–70 min.
 `dev_build=true` adds ftrace/perf tracing (debug only, bigger Image).
 
-Artifacts: `boot.img` (fastboot), `AnyKernel3-*.zip` (rooted phone), raw `Image`/`Image.gz`, `SHA256SUMS.txt`.
+Artifacts: raw `Image`/`Image.gz` (the kernel), `AnyKernel3-*.zip` (installs that kernel on a
+rooted phone without touching your boot header/dtb), `SHA256SUMS.txt`. **No `boot.img`** —
+see below.
 
 Actions artifacts expire after 14 days — set **`publish_release: true`** to also attach
 the same files to a GitHub **Release** (`releases/tag/gold-r<run>`), which is the copy
@@ -51,13 +53,13 @@ to keep and the easiest one to download on the phone.
 ### Status
 
 **Permanent download:** [`releases/tag/gold-r10`](https://github.com/evorez/Gold-kernel/releases/tag/gold-r10)
-(`boot.img`, AnyKernel3 zip, raw images, `SHA256SUMS.txt`, `gold-profiles.sh`, `FEATURES.md`)
+(raw `Image`/`Image.gz`, AnyKernel3 zip, `SHA256SUMS.txt`, `gold-profiles.sh`, `FEATURES.md`)
 — built by run `44571462688`, published with `publish_release=true`.
 
 Last full CI build: **run 44558056460 — green** (`main`, 2026-11-19, 15 min 19 s
 end to end, ~11 min of that is Bazel). Artifact: `gold-custom-kernelsu-susfstrue-9`
-(~63 MB: `boot.img` + AnyKernel3 zip + raw images + `SHA256SUMS.txt` +
-`gold-profiles.sh` + `FEATURES.md`).
+(AnyKernel3 zip + raw `Image`/`Image.gz` + `SHA256SUMS.txt` + `gold-profiles.sh` +
+`FEATURES.md`).
 
 - The pipeline verifies its own output: source pinned to `e56cf6b09cca`, the config
   read back **out of the built Image** satisfied all **48 required** feature options
@@ -67,9 +69,8 @@ end to end, ~11 min of that is Bazel). Artifact: `gold-custom-kernelsu-susfstrue
   (`mm/memory.c`, `block/ioprio.c`) — reported, not silently allowed.
 - **Not flashed on hardware yet.** The first flash is the acceptance test — keep
   your ROM's stock `boot.img`.
-- Two optional inputs make the first flash safer: `stock_boot_url` (copies
-  cmdline/os_version from your own boot.img) and `stock_symvers_url` (turns the
-  KMI gate into a hard CRC comparison against the stock build).
+- One optional input makes the first flash safer: `stock_symvers_url` (turns the KMI
+  gate into a hard CRC comparison against the stock build).
 
 ### Read before flashing
 
@@ -87,7 +88,11 @@ end to end, ~11 min of that is Bazel). Artifact: `gold-custom-kernelsu-susfstrue
 
 - Nothing is flashed by CI. Artifacts are built, not installed.
 - gold's `boot` partition holds **only the kernel** (header v4, no ramdisk, no
-  `init_boot` partition; the ramdisk lives in `vendor_boot`), so a custom kernel is
-  a single `boot.img` flash — `vendor_boot`/`vbmeta`/`dtbo` are left alone.
+  `init_boot` partition; the ramdisk lives in `vendor_boot`), so swapping the kernel
+  touches nothing else — `vendor_boot`/`vbmeta`/`dtbo` are left alone.
+- **This repo ships the kernel, not a `boot.img`.** Packing a boot image means
+  guessing header/cmdline and (on gold) the dtb; a wrong guess is a non-booting
+  phone. The AnyKernel3 zip does the opposite: it splits *your* existing boot and
+  swaps only the kernel, so your stock header/dtb/ramdisk stay byte-identical.
 - Keep a way back to stock (fastboot + your ROM's `boot.img`, and `vbmeta` if AVB
   complains) before flashing anything.

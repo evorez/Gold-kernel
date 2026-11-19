@@ -108,4 +108,4 @@ Legend
 | every `REQ` option really is in the Image, `OPT` ones reported | `scripts/verify-build.sh` (reads config **out of the Image**) |
 | no thermal/OPP/governor/display/fsync changes, SELinux on | `scripts/check-policy.sh` |
 | prebuilt vendor modules can still load | `scripts/check-kmi.sh` |
-| the flashable file has the right shape | `scripts/package.sh` → `scripts/bootimg.py verify` |
+| the artifact really contains this kernel (and nothing else) | `scripts/package.sh` (zip checks: `BLOCK=boot`, kernel version inside the packed `Image`) |
