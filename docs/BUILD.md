@@ -19,6 +19,8 @@ KMI + package <1 min). Budget up to 60 min if the runner is slow.
 | `susfs_ref` | `f98f0822` | susfs4ksu commit on branch `gki-android15-6.6`. Its commit message names KernelSU `64833c00` as the synced upstream — the two pins must stay a coherent pair. |
 | `crc_stub` | `false` | Patch `check_version()` to skip genksyms CRC comparison. Use **only** if vendor modules complain at boot. |
 | `extra_config` | *(empty)* | Extra defconfig lines, one per row, e.g. `CONFIG_IP_NF_TARGET_TTL=y` |
+| `boot_img_url` | *(empty)* | Direct **or** Google Drive share link to **your ROM's** `boot.img`. If given, the build repacks it with only the kernel payload swapped (header/cmdline/ramdisk/tail stay byte-identical) and ships a ready-to-flash `boot.img`. |
+| `vendor_boot_url` | *(empty)* | Share link to your ROM's `vendor_boot.img`. **Reference only** — it is inspected (dtb size, vendor ramdisk) and never modified. |
 | `stock_symvers_url` | *(empty)* | Direct link to a reference `Module.symvers` (stock GKI build) → enables the **hard CRC gate**. |
 | `formats` | `anykernel,image` | Which artifacts to package: `image` (raw `Image`/`Image.gz`), `anykernel` (installable zip). `bootimg` was removed — no `boot.img` is packed. |
 
@@ -28,6 +30,11 @@ KMI + package <1 min). Budget up to 60 min if the runner is slow.
    pins `common` to tag `android15-6.6-2026-01_r34`, and **fails** unless HEAD is
    exactly `e56cf6b09cca2151bcee244b3d334fb68685ff57` / version `6.6.118` — the
    build the phone is actually running.
+1b. **Stock boot images** (optional, `boot_img_url` / `vendor_boot_url`) — downloads them
+   (Drive share links are converted to direct downloads), checks the `ANDROID!` /
+   `VNDRBOOT` magic, and prints the header layout: header version, cmdline,
+   `os_version`, kernel size, ramdisk size, **tail size** (a dtb, if the ROM appends
+   one) and the kernel container format (gzip / arm64 Image / mtk-header).
 2. **Stock parity** (`scripts/fix-gki-config.sh`) — `MODULE_SIG_PROTECT` off,
    LTO stays `NONE`, CFI stays on, `MODVERSIONS=y`, KPROBES/KALLSYMS on, protected
    export lists removed, `check_defconfig` gate disabled, kernel name suffixed
@@ -59,6 +66,10 @@ KMI + package <1 min). Budget up to 60 min if the runner is slow.
    `android/abi_gki_aarch64` must still be exported, and (when a reference
    `Module.symvers` is supplied) every shared symbol must have an identical CRC.
    This is the check that prevents "compiles fine, black screen on boot".
+7b. **boot.img (optional)** — only when a stock `boot.img` was supplied: `bootimg.py repack`
+   replaces the kernel payload and copies everything else byte for byte, then `verify`
+   asserts the header (except `kernel_size`), ramdisk and tail are unchanged, the
+   kernel is ours, and the image still fits the 64 MiB partition.
 8. **Package** (`scripts/package.sh`) — raw `Image`/`Image.gz` (the deliverable),
    `AnyKernel3-*.zip`, `NOTES.txt`, `SHA256SUMS.txt`, plus
    `gold-profiles.sh` and `FEATURES.md` so the runtime profiles travel with the build.
@@ -69,6 +80,7 @@ KMI + package <1 min). Budget up to 60 min if the runner is slow.
 
 | File | Use |
 |---|---|
+| `boot.img` | **only if you passed `boot_img_url`**: your stock image with just the kernel swapped — `fastboot flash boot boot.img` |
 | `Image-*` / `Image-*.gz` | the kernel itself — use it to pack your own boot image |
 | `AnyKernel3-*.zip` | install on a rooted phone (KernelFlasher app / recovery): splits your existing boot and swaps only the kernel |
 | `SHA256SUMS.txt` | integrity check before flashing |

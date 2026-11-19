@@ -3,6 +3,8 @@
 #
 # Outputs:
 #   Image-<name> / Image-<name>.gz  <- the raw kernel (the actual deliverable)
+#   boot.img                        <- only when STOCK_BOOT is given: the user's own
+#                                      boot image with nothing but the kernel swapped
 #   AnyKernel3-<name>-<ver>.zip     <- flash from a rooted phone (KernelFlasher)
 #   Image / Image.gz                <- raw kernel, for manual repacking
 #   NOTES.txt / SHA256SUMS.txt      <- what this is, how to flash, rollback
@@ -15,7 +17,8 @@
 #
 # Usage: package.sh
 # Env:   DIST (bazel dist dir) | IMAGE / IMAGE_GZ, OUTDIR, KERNEL_NAME,
-#        FORMATS (comma list), ROOT_FLAVOR
+#        FORMATS (comma list), ROOT_FLAVOR, STOCK_BOOT (optional), VENDOR_BOOT (optional),
+#        PART_SIZE
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -23,6 +26,9 @@ DIST="${DIST:-}"
 OUTDIR="${OUTDIR:-$PWD/artifacts}"
 KERNEL_NAME="${KERNEL_NAME:-gold-custom}"
 FORMATS="${FORMATS:-anykernel,image}"
+STOCK_BOOT="${STOCK_BOOT:-}"
+VENDOR_BOOT="${VENDOR_BOOT:-}"
+PART_SIZE="${PART_SIZE:-67108864}"        # BOARD_BOOTIMAGE_PARTITION_SIZE for gold
 case ",$FORMATS," in
     *,bootimg,*)
         echo "::warning::format 'bootimg' was removed from this project (kernel only); ignoring it"
@@ -57,10 +63,26 @@ if [ ! -f "$IMAGE_GZ" ]; then
     esac
 fi
 
-# NOTE: there is deliberately no boot.img step. Packing one means guessing
-# header/cmdline/os_version and (on gold) the dtb, and a wrong guess is a
-# non-booting phone. The artifact is the kernel; packing it into a boot image is
-# the user's call, with their own stock boot.img as the reference.
+# --------------------------------------------------------------- boot.img
+# Built ONLY from the user's own stock boot image, and only by swapping the kernel
+# payload: header (cmdline/os_version/page size), ramdisk and trailing bytes (the
+# dtb, if the ROM puts one there) are copied byte for byte. No guessing.
+if [ -n "$STOCK_BOOT" ] && [ -f "$STOCK_BOOT" ]; then
+    echo "==> boot.img: repacking the provided stock boot image"
+    python3 "$SCRIPT_DIR/bootimg.py" inspect "$STOCK_BOOT" | sed 's/^/      /'
+    if [ -n "$VENDOR_BOOT" ] && [ -f "$VENDOR_BOOT" ]; then
+        echo "==> vendor_boot.img (reference only, never modified)"
+        python3 "$SCRIPT_DIR/bootimg.py" vendor "$VENDOR_BOOT" | sed 's/^/      /'
+    fi
+    python3 "$SCRIPT_DIR/bootimg.py" repack "$STOCK_BOOT" "$IMAGE_GZ" "$OUTDIR/boot.img" "$PART_SIZE" \
+        || { echo "::error::could not repack the stock boot image"; exit 1; }
+    python3 "$SCRIPT_DIR/bootimg.py" verify "$OUTDIR/boot.img" "$IMAGE_GZ" "$STOCK_BOOT" "$PART_SIZE" \
+        || { echo "::error::repacked boot.img failed verification"; exit 1; }
+    ls -lh "$OUTDIR/boot.img" | sed 's/^/    /'
+else
+    echo "==> boot.img: not built (no stock boot image provided)"
+    echo "    this build ships the kernel only; see docs/FLASH.md"
+fi
 
 # --------------------------------------------------------------- AnyKernel3
 if has anykernel; then
@@ -148,9 +170,18 @@ chmod +x "$OUTDIR/gold-profiles.sh" 2>/dev/null || true
     echo "root flavor: ${EFFECTIVE_ROOT_FLAVOR:-none} (susfs=${EFFECTIVE_USE_SUSFS:-false})"
     echo "ksu: ${KSU_SHA:-n/a}"
     echo
-    echo "THIS ARTIFACT IS THE KERNEL ONLY (raw Image / Image.gz + AnyKernel3 zip)."
-    echo "No boot.img is packed - see docs/FLASH.md for why."
-    echo
+    if [ -f "$OUTDIR/boot.img" ]; then
+        echo "boot.img IS included - it is YOUR stock boot image with only the kernel"
+        echo "payload swapped. Header/cmdline/ramdisk/tail (dtb) are byte-identical to"
+        echo "the image you supplied, so there is nothing guessed:"
+        echo "  fastboot flash boot boot.img"
+        echo "  fastboot reboot"
+        echo
+    else
+        echo "THIS ARTIFACT IS THE KERNEL ONLY (raw Image / Image.gz + AnyKernel3 zip)."
+        echo "No boot.img was packed (no stock boot image was given) - see docs/FLASH.md."
+        echo
+    fi
     echo "INSTALL (rooted phone, KernelFlasher app or a recovery):"
     echo "  flash AnyKernel3-*.zip - it splits your existing boot and swaps only the kernel,"
     echo "  so your stock header/dtb/ramdisk stay exactly as they are"
@@ -171,7 +202,7 @@ chmod +x "$OUTDIR/gold-profiles.sh" 2>/dev/null || true
     echo "Read docs/FLASH.md (Hinglish) before the first flash."
 } >"$OUTDIR/NOTES.txt"
 
-( cd "$OUTDIR" && sha256sum AnyKernel3-*.zip Image-* 2>/dev/null >SHA256SUMS.txt || true )
+( cd "$OUTDIR" && sha256sum boot.img AnyKernel3-*.zip Image-* 2>/dev/null >SHA256SUMS.txt || true )
 
 echo "==> artifacts in $OUTDIR:"
 ls -lh "$OUTDIR"

@@ -67,8 +67,10 @@ end, ~11 min of that is Bazel). Artifact: `gold-custom-kernelsu-susfstrue-11`.
   `block/ioprio.c`) — reported, not silently allowed.
 - **Not flashed on hardware yet.** The first flash is the acceptance test — keep
   your ROM's stock `boot.img` for rollback.
-- One optional input makes the first flash safer: `stock_symvers_url` (turns the
-  KMI gate into a hard CRC comparison against the stock build).
+- Two optional inputs make the first flash safer: `stock_symvers_url` (hard CRC
+  comparison against the stock build) and `boot_img_url` (your ROM's boot.img → the
+  build returns a ready-to-flash `boot.img` with only the kernel swapped, dtb and
+  header untouched).
 
 ### Read before flashing
 

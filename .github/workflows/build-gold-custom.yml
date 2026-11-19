@@ -64,6 +64,14 @@ on:
         description: "Extra defconfig lines, one per row (e.g. CONFIG_FOO=y)"
         type: string
         default: ""
+      boot_img_url:
+        description: "Direct/share URL of YOUR ROM's boot.img - if given, a boot.img is repacked with only the kernel swapped"
+        type: string
+        default: ""
+      vendor_boot_url:
+        description: "Direct/share URL of YOUR ROM's vendor_boot.img (reference only: dtb/vendor ramdisk are never modified)"
+        type: string
+        default: ""
       stock_symvers_url:
         description: "Direct URL to a reference Module.symvers (optional, enables hard CRC check)"
         type: string
@@ -101,6 +109,8 @@ env:
   SUSFS_REF: ${{ inputs.susfs_ref }}
   CRC_STUB: ${{ inputs.crc_stub }}
   EXTRA_CONFIG: ${{ inputs.extra_config }}
+  BOOT_IMG_URL: ${{ inputs.boot_img_url }}
+  VENDOR_BOOT_URL: ${{ inputs.vendor_boot_url }}
   STOCK_SYMVERS_URL: ${{ inputs.stock_symvers_url }}
   FORMATS: ${{ inputs.formats }}
 
@@ -195,6 +205,50 @@ jobs:
             exit 1
           fi
 
+      - name: Fetch the stock boot images (optional, for a ready-to-flash boot.img)
+        if: ${{ inputs.boot_img_url != '' }}
+        run: |
+          set -euo pipefail
+          direct() {   # Google Drive share links -> direct download, anything else as-is
+            local u="$1" id=""
+            case "$u" in
+              *drive.google.com/file/d/*) id="${u#*file/d/}"; id="${id%%/*}" ;;
+              *id=*)                      id="${u#*id=}";   id="${id%%&*}" ;;
+            esac
+            if [ -n "$id" ]; then
+              printf 'https://drive.usercontent.google.com/download?id=%s&export=download&confirm=t' "$id"
+            else
+              printf '%s' "$u"
+            fi
+          }
+          fetch() {    # fetch <url> <dest> <magic>
+            local url dest magic
+            url="$(direct "$1")"; dest="$2"; magic="$3"
+            echo "==> downloading $(basename "$dest")"
+            curl -fsSL --retry 3 --retry-delay 5 --max-time 1200 -o "$dest" "$url" \
+              || { echo "::error::download failed for $1"; exit 1; }
+            local got size
+            got="$(head -c "${#magic}" "$dest")"
+            size="$(stat -c%s "$dest")"
+            if [ "$got" != "$magic" ] || [ "$size" -lt 1000000 ]; then
+              echo "::error::$(basename "$dest") is not the expected image (magic '$got', $size bytes)."
+              echo "::error::Share it as 'anyone with the link' and pass the /file/d/<id>/ link."
+              echo "::error::If the link is a Drive share link, keep it as /file/d/<id>/view and share as 'anyone with the link'."
+              exit 1
+            fi
+            echo "    $(basename "$dest"): $size bytes, magic OK"
+          }
+
+          mkdir -p "$GITHUB_WORKSPACE/stock"
+          fetch "$BOOT_IMG_URL" "$GITHUB_WORKSPACE/stock/boot.img" "ANDROID!"
+          python3 "$GITHUB_WORKSPACE/scripts/bootimg.py" inspect "$GITHUB_WORKSPACE/stock/boot.img" | sed 's/^/    /'
+          if [ -n "${VENDOR_BOOT_URL:-}" ]; then
+            fetch "$VENDOR_BOOT_URL" "$GITHUB_WORKSPACE/stock/vendor_boot.img" "VNDRBOOT"
+            python3 "$GITHUB_WORKSPACE/scripts/bootimg.py" vendor "$GITHUB_WORKSPACE/stock/vendor_boot.img" | sed 's/^/    /'
+          else
+            echo "::notice::no vendor_boot_url given; the dtb/vendor ramdisk are not inspected (they are never modified either way)"
+          fi
+
       - name: Align config with the stock gold kernel
         run: bash "$GITHUB_WORKSPACE/scripts/fix-gki-config.sh" "$GITHUB_WORKSPACE/gki"
 
@@ -262,6 +316,12 @@ jobs:
           export DIST="$GITHUB_WORKSPACE/dist"
           export OUTDIR="$GITHUB_WORKSPACE/artifacts"
           export KERNEL_NAME FORMATS
+          if [ -f "$GITHUB_WORKSPACE/stock/boot.img" ]; then
+            export STOCK_BOOT="$GITHUB_WORKSPACE/stock/boot.img"
+          fi
+          if [ -f "$GITHUB_WORKSPACE/stock/vendor_boot.img" ]; then
+            export VENDOR_BOOT="$GITHUB_WORKSPACE/stock/vendor_boot.img"
+          fi
           bash "$GITHUB_WORKSPACE/scripts/package.sh"
 
       - name: Build summary
@@ -277,6 +337,7 @@ jobs:
             echo "| tweaks | ${TWEAKS:-false} (configs/gold-features.config) |"
             echo "| dev build | ${DEV_BUILD:-false} (ftrace/perf) |"
             echo "| crc stub | ${CRC_STUB:-false} |"
+            echo "| boot.img | $([ -f "$GITHUB_WORKSPACE/artifacts/boot.img" ] && echo "included - repacked from the supplied stock image (header/dtb/ramdisk untouched)" || echo "not built (kernel only)") |"
             echo "| artifacts | $(ls "$GITHUB_WORKSPACE/artifacts" 2>/dev/null | tr '\n' ' ') |"
             echo
             echo "Kernel only - no boot.img is packed. Rollback needs your ROM's stock \`boot.img\`. Read \`docs/FLASH.md\` (Hinglish) first."
@@ -298,9 +359,14 @@ jobs:
           set -euo pipefail
           TAG="gold-r${{ github.run_number }}"
           TITLE="gold custom kernel r${{ github.run_number }} (${COMMON_TAG:-android15-6.6}, ${EFFECTIVE_ROOT_FLAVOR:-none})"
+          if [ -f "$GITHUB_WORKSPACE/artifacts/boot.img" ]; then
+            BOOTLINE="Includes \`boot.img\`: YOUR stock boot image with only the kernel payload swapped (header/cmdline/ramdisk/tail byte-identical)."
+          else
+            BOOTLINE="Kernel only (Image / Image.gz / AnyKernel3 zip, no boot.img)."
+          fi
           NOTES="Built from \`${EXPECTED_FULL_SHA}\` (\`${COMMON_TAG}\`, kernel ${EXPECTED_VERSION}, 4 KB pages).
           root=${EFFECTIVE_ROOT_FLAVOR:-none}, susfs=${EFFECTIVE_USE_SUSFS:-false}, tweaks=${TWEAKS:-false}, dev_build=${DEV_BUILD:-false}.
-          Kernel only (Image / Image.gz / AnyKernel3 zip, no boot.img). **Not hardware-tested yet** - keep your ROM's stock boot.img. Install guide: docs/FLASH.md."
+          ${BOOTLINE} **Not hardware-tested yet** - keep your ROM's stock boot.img. Install guide: docs/FLASH.md."
           if gh release view "$TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
             echo "release $TAG already exists - uploading assets into it"
           else
