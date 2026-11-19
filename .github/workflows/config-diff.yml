@@ -40,14 +40,25 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           set -euo pipefail
-          gh release download "${{ inputs.tag }}" -p 'Image.gz' -D /tmp/ours --clobber
-          echo "::notice::ours: $(stat -c%s /tmp/ours/Image.gz) bytes (${{ inputs.tag }})"
+          api="repos/${{ github.repository }}/releases/tags/${{ inputs.tag }}"
+          if ! rel="$(gh api "$api" 2>&1)"; then
+            echo "::error::cannot read release ${{ inputs.tag }}: $(echo "$rel" | head -c 300)"
+            exit 1
+          fi
+          url="$(echo "$rel" | python3 -c 'import json,sys;d=json.load(sys.stdin);print(next((a["url"] for a in d["assets"] if a["name"]=="Image.gz"),""))')"
+          if [ -z "$url" ]; then
+            echo "::error::release ${{ inputs.tag }} has no Image.gz asset"
+            echo "$rel" | python3 -c 'import json,sys;[print("::error::asset: "+a["name"]) for a in json.load(sys.stdin)["assets"][:10]]'
+            exit 1
+          fi
+          curl -fsSL -H "Authorization: Bearer $GH_TOKEN" -H "Accept: application/octet-stream" -o /tmp/ours-Image.gz "$url"
+          echo "::notice::ours: $(stat -c%s /tmp/ours-Image.gz) bytes (${{ inputs.tag }})"
 
       - name: Extract both configs and build the delta
         run: |
           set -euo pipefail
           python3 scripts/bootimg.py config /tmp/stock.img /tmp/stock.config | tail -1
-          python3 scripts/bootimg.py config /tmp/ours/Image.gz /tmp/ours.config | tail -1
+          python3 scripts/bootimg.py config /tmp/ours-Image.gz /tmp/ours.config | tail -1
           sort -o /tmp/s.sorted /tmp/stock.config
           sort -o /tmp/o.sorted /tmp/ours.config
           comm -23 /tmp/s.sorted /tmp/o.sorted > /tmp/only-stock.txt
