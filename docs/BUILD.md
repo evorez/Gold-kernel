@@ -19,9 +19,8 @@ KMI + package <1 min). Budget up to 60 min if the runner is slow.
 | `susfs_ref` | `f98f0822` | susfs4ksu commit on branch `gki-android15-6.6`. Its commit message names KernelSU `64833c00` as the synced upstream — the two pins must stay a coherent pair. |
 | `crc_stub` | `false` | Patch `check_version()` to skip genksyms CRC comparison. Use **only** if vendor modules complain at boot. |
 | `extra_config` | *(empty)* | Extra defconfig lines, one per row, e.g. `CONFIG_IP_NF_TARGET_TTL=y` |
-| `stock_boot_url` | *(empty)* | Direct link to your ROM's `boot.img`. Header/cmdline/os_version are copied from it. |
 | `stock_symvers_url` | *(empty)* | Direct link to a reference `Module.symvers` (stock GKI build) → enables the **hard CRC gate**. |
-| `formats` | `bootimg,anykernel,image` | Which artifacts to package. |
+| `formats` | `anykernel,image` | Which artifacts to package: `image` (raw `Image`/`Image.gz`), `anykernel` (installable zip). `bootimg` was removed — no `boot.img` is packed. |
 
 ## What the job does
 
@@ -60,8 +59,8 @@ KMI + package <1 min). Budget up to 60 min if the runner is slow.
    `android/abi_gki_aarch64` must still be exported, and (when a reference
    `Module.symvers` is supplied) every shared symbol must have an identical CRC.
    This is the check that prevents "compiles fine, black screen on boot".
-8. **Package** (`scripts/package.sh`) — `boot.img` (header v4, kernel only),
-   `AnyKernel3-*.zip`, raw `Image`/`Image.gz`, `NOTES.txt`, `SHA256SUMS.txt`, plus
+8. **Package** (`scripts/package.sh`) — raw `Image`/`Image.gz` (the deliverable),
+   `AnyKernel3-*.zip`, `NOTES.txt`, `SHA256SUMS.txt`, plus
    `gold-profiles.sh` and `FEATURES.md` so the runtime profiles travel with the build.
    With `publish_release=true` the same files are attached to a GitHub Release, which
    is the copy to keep (Actions artifacts expire after 14 days).
@@ -70,9 +69,8 @@ KMI + package <1 min). Budget up to 60 min if the runner is slow.
 
 | File | Use |
 |---|---|
-| `boot.img` | `fastboot flash boot boot.img` — primary |
-| `AnyKernel3-*.zip` | rooted phone, KernelFlasher app (keeps your dtb/header) |
-| `Image-*.gz` / `Image-*` | manual repacking |
+| `Image-*` / `Image-*.gz` | the kernel itself — use it to pack your own boot image |
+| `AnyKernel3-*.zip` | install on a rooted phone (KernelFlasher app / recovery): splits your existing boot and swaps only the kernel |
 | `SHA256SUMS.txt` | integrity check before flashing |
 
 Artifacts are **not** flashable by CI on their own: they need an unlocked
@@ -84,8 +82,8 @@ bootloader, and you must keep a stock `boot.img` for rollback. See
 | | |
 |---|---|
 | Last green run | `44571462688` (`main`, 2026-11-19, 24 min) — full feature set **+ published release** |
-| Release | `gold-r10` — `boot.img`, AnyKernel3 zip, raw images, `SHA256SUMS.txt`, profiles, `FEATURES.md` |
-| Inputs | defaults: `kernelsu` + SUSFS + tweaks, `dev_build=false`, no stock boot.img |
+| Release | `gold-r11` — raw images, AnyKernel3 zip, `SHA256SUMS.txt`, profiles, `FEATURES.md` (no `boot.img`) |
+| Inputs | defaults: `kernelsu` + SUSFS + tweaks, `dev_build=false` |
 | Artifact | `gold-custom-kernelsu-susfstrue-9` (~63 MB) |
 | Root pin | KernelSU `64833c00` |
 | SUSFS pin | `f98f0822` (`gki-android15-6.6`) |

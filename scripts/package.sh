@@ -2,7 +2,7 @@
 # Package the built kernel into everything needed to try it on gold.
 #
 # Outputs:
-#   boot.img                        <- fastboot flash boot (primary, kernel only)
+#   Image-<name> / Image-<name>.gz  <- the raw kernel (the actual deliverable)
 #   AnyKernel3-<name>-<ver>.zip     <- flash from a rooted phone (KernelFlasher)
 #   Image / Image.gz                <- raw kernel, for manual repacking
 #   NOTES.txt / SHA256SUMS.txt      <- what this is, how to flash, rollback
@@ -11,24 +11,26 @@
 # on this device; the ramdisk lives in vendor_boot), kernel = Image.gz, page size
 # 4096, cmdline "bootopt=64S3,32N2,64N2", partition size 64 MiB. Those values
 # come from the LineageOS device tree for gold (BoardConfig.mk) and can be
-# overridden by the header of a stock boot.img passed in STOCK_BOOT.
+# No boot.img is packed here: this repo ships the kernel, nothing else.
 #
 # Usage: package.sh
 # Env:   DIST (bazel dist dir) | IMAGE / IMAGE_GZ, OUTDIR, KERNEL_NAME,
-#        STOCK_BOOT (optional path), FORMATS (comma list), ROOT_FLAVOR
+#        FORMATS (comma list), ROOT_FLAVOR
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 DIST="${DIST:-}"
 OUTDIR="${OUTDIR:-$PWD/artifacts}"
 KERNEL_NAME="${KERNEL_NAME:-gold-custom}"
-FORMATS="${FORMATS:-bootimg,anykernel,image}"
-STOCK_BOOT="${STOCK_BOOT:-}"
-PART_SIZE="${PART_SIZE:-67108864}"       # BOOTIMAGE_PARTITION_SIZE for gold
-# Defaults, used only when no stock boot.img is supplied.
-CMDLINE="${CMDLINE:-bootopt=64S3,32N2,64N2}"
-OS_VERSION="${OS_VERSION:-16.0.0}"
-OS_PATCH="${OS_PATCH:-2026-01}"
+FORMATS="${FORMATS:-anykernel,image}"
+case ",$FORMATS," in
+    *,bootimg,*)
+        echo "::warning::format 'bootimg' was removed from this project (kernel only); ignoring it"
+        FORMATS="$(printf '%s' "$FORMATS" | sed -e 's/\<bootimg,\?//' -e 's/,\?bootimg//')"
+        [ -n "$FORMATS" ] && [ "$FORMATS" != "," ] || FORMATS="image"
+        echo "    using formats: $FORMATS"
+        ;;
+esac
 
 mkdir -p "$OUTDIR"
 has() { case ",$FORMATS," in *",$1,"*) return 0 ;; *) return 1 ;; esac; }
@@ -46,54 +48,19 @@ BASE="${KERNEL_NAME}-${KVER}"
 echo "==> kernel:  $KVER"
 echo "==> formats: $FORMATS"
 
+GEN_GZ=0
 if [ ! -f "$IMAGE_GZ" ]; then
     case "$IMAGE" in
         *.gz) IMAGE_GZ="$IMAGE" ;;
         *) IMAGE_GZ="$OUTDIR/Image.gz"; gzip -9n -c "$IMAGE" >"$IMAGE_GZ"
-           echo "    compressed Image -> Image.gz" ;;
+           GEN_GZ=1; echo "    compressed Image -> Image.gz" ;;
     esac
 fi
 
-# ------------------------------------------------ header values from the ROM
-if [ -n "$STOCK_BOOT" ] && [ -f "$STOCK_BOOT" ]; then
-    echo "==> stock boot.img given: $STOCK_BOOT"
-    python3 "$SCRIPT_DIR/bootimg.py" inspect "$STOCK_BOOT" >/tmp/stock-boot.json
-    sed 's/^/      /' /tmp/stock-boot.json
-    field() { python3 -c 'import json,sys;print(json.load(open("/tmp/stock-boot.json"))[sys.argv[1]])' "$1"; }
-    HV="$(field header_version)"
-    RS="$(field ramdisk_size)"
-    if [ "$HV" != "4" ]; then
-        echo "::warning::stock boot.img has header v$HV, not v4 - using v4 anyway"
-    fi
-    case "$RS" in
-        0) ;;
-        *) echo "::warning::stock boot.img has a $RS-byte ramdisk; gold's boot should have none."
-           echo "::warning::this build keeps the kernel only - double-check before flashing" ;;
-    esac
-    CMDLINE="$(field cmdline)"
-    OS_VERSION="$(field os_version)"
-    OS_PATCH="$(field os_patch_level)"
-    echo "    taking cmdline/os_version from the stock image"
-else
-    echo "==> no stock boot.img: using gold's BOARD_MKBOOTIMG_ARGS defaults"
-    echo "::warning::cmdline '$CMDLINE', os $OS_VERSION/$OS_PATCH, 64 MiB partition assumed."
-    echo "::warning::if the build does not boot, re-run with stock_boot_url pointing at your ROM's boot.img."
-fi
-
-# ------------------------------------------------------------------ boot.img
-if has bootimg; then
-    echo "==> building boot.img (header v4, kernel only, pagesize 4096)"
-    python3 "$SCRIPT_DIR/mkbootimg.py" \
-        --header_version 4 \
-        --kernel "$IMAGE_GZ" \
-        --cmdline "$CMDLINE" \
-        --os_version "$OS_VERSION" \
-        --os_patch_level "$OS_PATCH" \
-        --output "$OUTDIR/boot.img"
-    python3 "$SCRIPT_DIR/bootimg.py" verify "$OUTDIR/boot.img" "$IMAGE_GZ" "$PART_SIZE" \
-        || { echo "::error::packaged boot.img failed verification"; exit 1; }
-    ls -lh "$OUTDIR/boot.img" | sed 's/^/    /'
-fi
+# NOTE: there is deliberately no boot.img step. Packing one means guessing
+# header/cmdline/os_version and (on gold) the dtb, and a wrong guess is a
+# non-booting phone. The artifact is the kernel; packing it into a boot image is
+# the user's call, with their own stock boot.img as the reference.
 
 # --------------------------------------------------------------- AnyKernel3
 if has anykernel; then
@@ -171,6 +138,9 @@ for f in "$SCRIPT_DIR/../tools/gold-profiles.sh" "$SCRIPT_DIR/../docs/FEATURES.m
 done
 chmod +x "$OUTDIR/gold-profiles.sh" 2>/dev/null || true
 
+# the intermediate Image.gz is only a build aid; the artifact is Image-<base>.gz
+[ "$GEN_GZ" = 1 ] && rm -f "$OUTDIR/Image.gz"
+
 # ------------------------------------------------------------------- notes
 {
     echo "gold custom kernel - $KVER"
@@ -178,11 +148,14 @@ chmod +x "$OUTDIR/gold-profiles.sh" 2>/dev/null || true
     echo "root flavor: ${EFFECTIVE_ROOT_FLAVOR:-none} (susfs=${EFFECTIVE_USE_SUSFS:-false})"
     echo "ksu: ${KSU_SHA:-n/a}"
     echo
-    echo "QUICK FLASH (bootloader unlocked, phone in fastboot):"
-    echo "  fastboot flash boot boot.img"
-    echo "  fastboot reboot"
+    echo "THIS ARTIFACT IS THE KERNEL ONLY (raw Image / Image.gz + AnyKernel3 zip)."
+    echo "No boot.img is packed - see docs/FLASH.md for why."
     echo
-    echo "ROLLBACK - keep your stock boot.img and:"
+    echo "INSTALL (rooted phone, KernelFlasher app or a recovery):"
+    echo "  flash AnyKernel3-*.zip - it splits your existing boot and swaps only the kernel,"
+    echo "  so your stock header/dtb/ramdisk stay exactly as they are"
+    echo
+    echo "ROLLBACK - keep your ROM's stock boot.img and:"
     echo "  fastboot flash boot <stock-boot.img>"
     echo "  fastboot reboot"
     echo
@@ -198,7 +171,7 @@ chmod +x "$OUTDIR/gold-profiles.sh" 2>/dev/null || true
     echo "Read docs/FLASH.md (Hinglish) before the first flash."
 } >"$OUTDIR/NOTES.txt"
 
-( cd "$OUTDIR" && sha256sum boot.img AnyKernel3-*.zip Image-* 2>/dev/null >SHA256SUMS.txt || true )
+( cd "$OUTDIR" && sha256sum AnyKernel3-*.zip Image-* 2>/dev/null >SHA256SUMS.txt || true )
 
 echo "==> artifacts in $OUTDIR:"
 ls -lh "$OUTDIR"
