@@ -13,7 +13,7 @@ name: Build GOLD custom kernel (android15-6.6, 4 KB, root + tweaks)
 #     crypto, mq-deadline, pstore/ramoops, WireGuard, exFAT, NTFS3, gamepad HID,
 #     BBR+fq default) - all built in, no module to push
 #   * kernel name suffixed "...-4k-golden" so a flashed build is identifiable
-#   * project name: GoldenEra (author @Evorez) - appears in the release title,
+#   * project name: GoldenEra (author 𝙴𝚅𝙾𝚁𝙴𝚉) - appears in the release title,
 #     the zip/boot.img names and NOTES.txt
 #   * deliverables are the kernel itself: Image, Image.gz, AnyKernel3 zip
 #
@@ -339,13 +339,13 @@ jobs:
           set -euo pipefail
           TAG="gold-r${{ github.run_number }}"
           VARIANTS="root=${EFFECTIVE_ROOT_FLAVOR:-none},susfs=${EFFECTIVE_USE_SUSFS:-false},tweaks=${TWEAKS:-false}"
-          TITLE="GoldenEra v1 - r${{ github.run_number }} (${VARIANTS})"
+          TITLE="GoldenEra v1 · 𝙴𝚅𝙾𝚁𝙴𝚉 — r${{ github.run_number }} (${VARIANTS})"
           if [ -f "$GITHUB_WORKSPACE/artifacts/boot.img" ]; then
             BOOTLINE="Includes \`boot.img\`: YOUR stock boot image with only the kernel payload swapped (header/cmdline/ramdisk/tail byte-identical)."
           else
             BOOTLINE="Kernel only (Image / Image.gz / AnyKernel3 zip, no boot.img)."
           fi
-          NOTES="**GoldenEra v1** for the Redmi Note 13 5G (gold) - by @Evorez.
+          NOTES="**GoldenEra v1** for the Redmi Note 13 5G (gold) - by 𝙴𝚅𝙾𝚁𝙴𝚉.
 
           Built from \`${EXPECTED_FULL_SHA}\` (\`${COMMON_TAG}\`, kernel ${EXPECTED_VERSION}, 4 KB pages).
           root=${EFFECTIVE_ROOT_FLAVOR:-none}, susfs=${EFFECTIVE_USE_SUSFS:-false}, tweaks=${TWEAKS:-false}, dev_build=${DEV_BUILD:-false}.
