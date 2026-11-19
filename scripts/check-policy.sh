@@ -94,7 +94,8 @@ fi
 banned='androidboot\.selinux=permissive|setenforce 0|selinux=0|thermal_bypass|disable_thermal|CONFIG_CPU_FREQ_DEFAULT_GOV_PERFORMANCE=y|CONFIG_CPU_FREQ_DEFAULT_GOV_USERSPACE=y|CONFIG_THERMAL_WRITABLE_TRIPS=y'
 hits="$(grep -rInE "$banned" "$REPO_DIR/configs" "$REPO_DIR/scripts" "$REPO_DIR/tools" \
         --include='*.config' --include='*.sh' --include='*.yml' 2>/dev/null \
-        | grep -vE 'check-policy\.sh|^\s*#' || true)"
+        | grep -vE 'check-policy\.sh' \
+        | grep -vE '^[^:]+:[0-9]+:[[:space:]]*#' || true)"
 if [ -n "$hits" ]; then
     echo "::error::policy: a forbidden pattern appears in this repo:"
     printf '%s\n' "$hits" | head -10 | while IFS= read -r line; do
