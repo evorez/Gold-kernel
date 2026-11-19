@@ -194,7 +194,7 @@ chmod +x "$OUTDIR/gold-profiles.sh" 2>/dev/null || true
 # ------------------------------------------------------------------- notes
 {
     echo "GoldenEra v1 - custom kernel for the Redmi Note 13 5G (gold)"
-    echo "author: 𝙴𝚅𝙾𝚁𝙴𝚉"
+    echo "author: 𝙴𝚟𝚘𝚛𝚎𝚣"
     echo "kernel: $KVER"
     echo "built:  $(date -u +%Y-%m-%dT%H:%M:%SZ)"
     echo "root flavor: ${EFFECTIVE_ROOT_FLAVOR:-none} (susfs=${EFFECTIVE_USE_SUSFS:-false})"
