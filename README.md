@@ -20,8 +20,8 @@ The old Xiaomi `gold-s-oss` source is Android 13 / kernel 5.10 — **not** compa
 
 ## Custom kernel — kya milta hai
 
-- **Root built into the kernel**: SukiSU Ultra (default) or KernelSU-Next — no Magisk-style patching needed.
-- **SUSFS** root hiding (needs SukiSU Ultra; the workflow switches automatically).
+- **Root built into the kernel**: KernelSU (default, the fork SUSFS patches are maintained against) or KernelSU-Next — no Magisk-style patching needed.
+- **SUSFS** root hiding: the upstream pair (susfs4ksu + its `10_enable_susfs_for_ksu.patch`), both ends pinned to a coherent commit pair.
 - **Tweaks**: BBR + fq as default TCP congestion control, MGLRU, WireGuard, NTFS3 — all built in (`=y`), so nothing has to be pushed to a system partition.
 - Kernel name ends in `-4k-gold`, so `uname -r` tells you a custom build is running.
 - Guard rails: stock config parity, in-image config verification, and a **KMI gate** so the prebuilt MediaTek vendor modules still load.
@@ -29,7 +29,7 @@ The old Xiaomi `gold-s-oss` source is Android 13 / kernel 5.10 — **not** compa
 ### Run it
 
 Actions → **Build GOLD custom kernel (android15-6.6, 4 KB, root + tweaks)** → *Run workflow*.
-Defaults are the sensible ones (`sukisu` + SUSFS + tweaks). A build takes ~40–70 min.
+Defaults are the sensible ones (`kernelsu` + SUSFS + tweaks). A build takes ~40–70 min.
 
 Artifacts: `boot.img` (fastboot), `AnyKernel3-*.zip` (rooted phone), raw `Image`/`Image.gz`, `SHA256SUMS.txt`.
 

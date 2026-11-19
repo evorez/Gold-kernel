@@ -9,11 +9,11 @@ One build takes roughly **40–70 minutes** on a stock `ubuntu-latest` runner
 
 | Input | Default | What it does |
 |---|---|---|
-| `root_flavor` | `sukisu` | `sukisu` (SukiSU Ultra, required for SUSFS), `ksu-next` (KernelSU-Next v3.x), `none` (no root) |
-| `use_susfs` | `true` | SUSFS root hiding. Automatically redirected to `sukisu` when `ksu-next` is chosen. |
+| `root_flavor` | `kernelsu` | `kernelsu` (tiann/KernelSU — required for SUSFS), `ksu-next` (KernelSU-Next v3.4.x), `none` (no root) |
+| `use_susfs` | `true` | SUSFS root hiding: susfs4ksu kernel patch **and** its `10_enable_susfs_for_ksu.patch`. Redirected to `kernelsu` when `ksu-next` is chosen (Next only has SUSFS as an LKM). |
 | `tweaks` | `true` | BBR + fq as default congestion control, MGLRU, WireGuard, NTFS3 — all built in (`=y`) |
-| `ksu_ref` | *(empty)* | Pin the root repo to a commit/tag. Empty = the verified pin (`6c5603f0` for SukiSU `builtin`). |
-| `susfs_ref` | `09fec8aa` | susfs4ksu commit on branch `gki-android15-6.6`. Must stay coherent with `ksu_ref`. |
+| `ksu_ref` | *(empty)* | Pin the root repo. Empty = the verified pin (`c680b548` for KernelSU, `v3.4.2` for Next). |
+| `susfs_ref` | `f98f0822` | susfs4ksu commit on branch `gki-android15-6.6` — the tip whose history names KernelSU `c680b548` as its synced commit. Must stay coherent with `ksu_ref`. |
 | `crc_stub` | `false` | Patch `check_version()` to skip genksyms CRC comparison. Use **only** if vendor modules complain at boot. |
 | `extra_config` | *(empty)* | Extra defconfig lines, one per row, e.g. `CONFIG_IP_NF_TARGET_TTL=y` |
 | `stock_boot_url` | *(empty)* | Direct link to your ROM's `boot.img`. Header/cmdline/os_version are copied from it. |
@@ -31,11 +31,12 @@ One build takes roughly **40–70 minutes** on a stock `ubuntu-latest` runner
    export lists removed, `check_defconfig` gate disabled, kernel name suffixed
    `-4k-gold`.
 3. **Tweaks** (`scripts/apply-tweaks.sh`) — built-in only, no `.ko` to push.
-4. **Root + SUSFS** (`scripts/apply-root.sh`) — clones SukiSU/KernelSU-Next,
+4. **Root + SUSFS** (`scripts/apply-root.sh`) — clones KernelSU / KernelSU-Next,
    wires `drivers/kernelsu`, runs a 1-second static coherence preflight (catches
-   upstream breakage before the 20-minute compile), applies susfs4ksu
-   (`fs/*`, `include/linux/*`, `50_add_susfs_in_gki-android15-6.6.patch`),
-   registers any newly exported symbols in the KMI list.
+   upstream breakage before the 20-minute compile), applies **both** susfs4ksu
+   patches (`50_add_susfs_in_gki-android15-6.6.patch` in the kernel tree,
+   `KernelSU/10_enable_susfs_for_ksu.patch` in the root tree), and registers any
+   newly exported symbols in the KMI list.
 5. **Build** — `tools/bazel run //common:kernel_aarch64_dist`.
 6. **Verify** (`scripts/verify-build.sh`) — reads the config **back out of the
    Image** (`IKCONFIG`) and asserts 4 KB pages, `LTO_NONE`, `CFI_CLANG`,

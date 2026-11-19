@@ -70,21 +70,26 @@ too, unless `crc_stub=true` is explicitly chosen.
 
 ## 4. Root solutions
 
-- **SukiSU Ultra**, branch `builtin` — implements `KSU_SUSFS*` itself, so SUSFS
-  needs no KSU-side patch. Pinned `6c5603f0` (newest revision whose feature
-  subsystem is self-consistent). Its tip is *not* always buildable: commits
-  referencing `kernel_umount_feature_set` / `KSU_FEATURE_WEBVIEW_ZYGOTE_UMOUNT`
-  fail ~20 min into the build. A ~1 s static preflight in `apply-root.sh` catches
-  that class of breakage up front.
-- **KernelSU-Next v3.x** — works, but cannot take the susfs4ksu KSU-side patch:
-  `10_enable_susfs_for_ksu.patch` deletes `hook/lsm_hook.o`,
-  `hook/syscall_hook_manager.o` and `infra/symbol_resolver.o` from
-  `kernel/Kbuild`, which are exactly the files v3.x is built on. Requesting
-  `ksu-next` + `use_susfs=true` is therefore redirected to SukiSU.
-- **SUSFS** — `gitlab.com/simonpunk/susfs4ksu`, branch `gki-android15-6.6`.
-  Kernel side = copy `kernel_patches/fs/*`, `kernel_patches/include/linux/*`,
-  apply `50_add_susfs_in_gki-android15-6.6.patch`. The userspace (module) part is
-  separate and installed from the manager app after boot.
+- **KernelSU (tiann/KernelSU) + SUSFS** — the pairing upstream maintains:
+  susfs4ksu ships two patches, and both are applied here:
+  `50_add_susfs_in_gki-android15-6.6.patch` (kernel tree: `fs/susfs.c`,
+  `include/linux/susfs{,_def}.h`, hooks) and
+  `KernelSU/10_enable_susfs_for_ksu.patch` (root tree: supercall dispatch +
+  the `KSU_SUSFS*` Kconfig symbols). Pins are a coherent pair: KernelSU
+  `c680b548` (named as the synced upstream in the SUSFS branch tip's history) and
+  SUSFS `f98f0822`. KernelSU at that revision defines `ksu_install_su_fd()`,
+  which the `50_` patch's `exec.c` hunk calls — an older tree fails to link.
+- **SukiSU Ultra `builtin`** was tried first and does not build with a pinned
+  SUSFS: its `kernel/supercall/dispatch.c` carries SUSFS dispatch code that
+  expects the *matching* susfs4ksu headers (`susfs_set_sid`,
+  `susfs_get_sid_from_name`, `CMD_SUSFS_*`, ...). With the older SUSFS pinned,
+  CI run 44519162981 died with a wall of `use of undeclared identifier
+  'CMD_SUSFS_...'` / `call to undeclared function 'susfs_...'`. Its tip is also
+  not buildable at every revision, so the pair is fragile.
+- **KernelSU-Next v3.4.x** — works as a root solution, but SUSFS exists only as
+  a separate LKM (`kernel/susfs` → `susfs_guard_lkm.ko`, loaded by `ksud`), so it
+  cannot be linked into the Image. `ksu-next` + `use_susfs` is redirected to
+  `kernelsu`.
 - KSU/SUSFS exports are added to `android/abi_gki_aarch64`, so Kleaf's KMI strict
   mode does not reject the build and `TRIM_UNUSED_KSYMS` does not drop them.
   Stock symbols are untouched → vendor module CRCs are unaffected.
