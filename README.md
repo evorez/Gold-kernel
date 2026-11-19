@@ -52,25 +52,23 @@ to keep and the easiest one to download on the phone.
 
 ### Status
 
-**Permanent download:** [`releases/tag/gold-r10`](https://github.com/evorez/Gold-kernel/releases/tag/gold-r10)
-(raw `Image`/`Image.gz`, AnyKernel3 zip, `SHA256SUMS.txt`, `gold-profiles.sh`, `FEATURES.md`)
-— built by run `44571462688`, published with `publish_release=true`.
+**Permanent download:** [`releases/tag/gold-r11`](https://github.com/evorez/Gold-kernel/releases/tag/gold-r11)
+— **kernel only**: raw `Image`/`Image.gz`, `AnyKernel3-*.zip`, `SHA256SUMS.txt`,
+`NOTES.txt`, `gold-profiles.sh`, `FEATURES.md`. No `boot.img` is built or shipped
+(see below). Published by run `44579469714` with `publish_release=true`.
 
-Last full CI build: **run 44558056460 — green** (`main`, 2026-11-19, 15 min 19 s
-end to end, ~11 min of that is Bazel). Artifact: `gold-custom-kernelsu-susfstrue-9`
-(AnyKernel3 zip + raw `Image`/`Image.gz` + `SHA256SUMS.txt` + `gold-profiles.sh` +
-`FEATURES.md`).
+Last full CI build: **run 44579469714 — green** (`main`, 2026-11-19, 24 min end to
+end, ~11 min of that is Bazel). Artifact: `gold-custom-kernelsu-susfstrue-11`.
 
 - The pipeline verifies its own output: source pinned to `e56cf6b09cca`, the config
   read back **out of the built Image** satisfied all **48 required** feature options
   (and all 20 optional ones), the policy gate passed, and the KMI list is intact.
-  (Previous green run: `44540769002`, root-only feature set.)
-- Policy gate warnings on this run were exactly the vendored SUSFS hunks
-  (`mm/memory.c`, `block/ioprio.c`) — reported, not silently allowed.
+- Policy gate warnings were exactly the vendored SUSFS hunks (`mm/memory.c`,
+  `block/ioprio.c`) — reported, not silently allowed.
 - **Not flashed on hardware yet.** The first flash is the acceptance test — keep
-  your ROM's stock `boot.img`.
-- One optional input makes the first flash safer: `stock_symvers_url` (turns the KMI
-  gate into a hard CRC comparison against the stock build).
+  your ROM's stock `boot.img` for rollback.
+- One optional input makes the first flash safer: `stock_symvers_url` (turns the
+  KMI gate into a hard CRC comparison against the stock build).
 
 ### Read before flashing
 
