@@ -80,11 +80,12 @@ bootloader, and you must keep a stock `boot.img` for rollback. See
 
 | | |
 |---|---|
-| Last green run | `44540769002` (`main`, 2026-11-19) |
-| Inputs | defaults: `kernelsu` + SUSFS + tweaks, no stock boot.img |
-| Artifact | `gold-custom-kernelsu-susfstrue-8` |
+| Last green run | `44558056460` (`main`, 2026-11-19, 15 min) — full feature set |
+| Inputs | defaults: `kernelsu` + SUSFS + tweaks, `dev_build=false`, no stock boot.img |
+| Artifact | `gold-custom-kernelsu-susfstrue-9` (~63 MB) |
 | Root pin | KernelSU `64833c00` |
 | SUSFS pin | `f98f0822` (`gki-android15-6.6`) |
+| Feature gates | in-Image config: 48 `REQ` + 20 `OPT` all present; policy gate passed (2 vendored-patch warnings); KMI list intact |
 
 ## When a build fails
 
