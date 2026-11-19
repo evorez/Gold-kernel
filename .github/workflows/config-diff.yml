@@ -82,29 +82,18 @@ jobs:
           grep -E "$ABI" /tmp/only-ours.txt  > /tmp/abi-ours.txt  || true
           echo "::notice::ABI-relevant delta: $(wc -l </tmp/abi-stock.txt) only-stock, $(wc -l </tmp/abi-ours.txt) only-ours"
 
-      - name: "Delta A: ABI / module-load options the stock kernel has and we do not"
+      - name: "Delta A/B: the complete ABI / module-load delta, both directions"
         run: |
-          head -n 10 /tmp/abi-stock.txt | sed 's/^/::notice::ONLY-STOCK /' || true
-          test -s /tmp/abi-stock.txt || echo "::notice::ONLY-STOCK none"
+          python3 scripts/annotate-file.py /tmp/abi-stock.txt "ONLY-STOCK " 6
+          python3 scripts/annotate-file.py /tmp/abi-ours.txt  "ONLY-OURS "  6
 
-      - name: "Delta B: ABI / module-load options we have and stock does not"
-        run: |
-          head -n 10 /tmp/abi-ours.txt | sed 's/^/::notice::ONLY-OURS /' || true
-          test -s /tmp/abi-ours.txt || echo "::notice::ONLY-OURS none"
-
-      - name: "Delta C: other options stock enables that we do not (first 10 of y/m)"
+      - name: "Delta C/D: everything else that differs (y/m lines)"
         run: |
           set -euo pipefail
           grep -E '^CONFIG_[A-Z0-9_]+=' /tmp/only-stock.txt | grep -vxFf /tmp/abi-stock.txt > /tmp/rest-stock.txt || true
-          echo "::notice::other only-stock (y/m): $(wc -l </tmp/rest-stock.txt)"
-          head -n 9 /tmp/rest-stock.txt | sed 's/^/::notice::ONLY-STOCK /' || true
-
-      - name: "Delta D: other options we enable that stock does not (first 10 of y/m)"
-        run: |
-          set -euo pipefail
-          grep -E '^CONFIG_[A-Z0-9_]+=' /tmp/only-ours.txt | grep -vxFf /tmp/abi-ours.txt > /tmp/rest-ours.txt || true
-          echo "::notice::other only-ours (y/m): $(wc -l </tmp/rest-ours.txt)"
-          head -n 9 /tmp/rest-ours.txt | sed 's/^/::notice::ONLY-OURS /' || true
+          grep -E '^CONFIG_[A-Z0-9_]+=' /tmp/only-ours.txt  | grep -vxFf /tmp/abi-ours.txt  > /tmp/rest-ours.txt  || true
+          python3 scripts/annotate-file.py /tmp/rest-stock.txt "OTHER ONLY-STOCK " 6
+          python3 scripts/annotate-file.py /tmp/rest-ours.txt  "OTHER ONLY-OURS "  6
 
       - name: "Delta E: the module-signing / KMI picture of both sides"
         run: |
