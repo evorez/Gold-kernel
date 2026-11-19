@@ -1,0 +1,93 @@
+name: Diff the stock config against a built kernel
+
+# Why: the r14 flash succeeded and the device then bootlooped, i.e. the kernel
+# never reached userspace. The failure class that matches best is "the kernel
+# itself is fine but the prebuilt MTK vendor modules are not", and that class is
+# decided by CONFIG deltas we cannot see without the *stock* .config. This job
+# pulls that config out of the user's own boot.img, pulls ours out of a released
+# Image.gz, and reports the delta as annotations (run logs are not always
+# reachable from every environment, annotations are).
+
+on:
+  workflow_dispatch:
+    inputs:
+      stock_boot_url:
+        description: "URL of the stock boot.img (Drive link is fine)"
+        type: string
+        required: true
+      tag:
+        description: "Release tag whose Image.gz to diff against"
+        type: string
+        default: "gold-r14"
+
+permissions:
+  contents: read
+
+jobs:
+  diff:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Fetch the stock boot.img
+        run: |
+          set -euo pipefail
+          python3 scripts/fetch_image.py "${{ inputs.stock_boot_url }}" /tmp/stock.img ANDROID!
+          echo "::notice::stock boot.img: $(stat -c%s /tmp/stock.img) bytes"
+
+      - name: Download our Image.gz from the release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          gh release download "${{ inputs.tag }}" -p 'Image.gz' -D /tmp/ours --clobber
+          echo "::notice::ours: $(stat -c%s /tmp/ours/Image.gz) bytes (${{ inputs.tag }})"
+
+      - name: Extract both configs and build the delta
+        run: |
+          set -euo pipefail
+          python3 scripts/bootimg.py config /tmp/stock.img /tmp/stock.config | tail -1
+          python3 scripts/bootimg.py config /tmp/ours/Image.gz /tmp/ours.config | tail -1
+          sort -o /tmp/s.sorted /tmp/stock.config
+          sort -o /tmp/o.sorted /tmp/ours.config
+          comm -23 /tmp/s.sorted /tmp/o.sorted > /tmp/only-stock.txt
+          comm -13 /tmp/s.sorted /tmp/o.sorted > /tmp/only-ours.txt
+          echo "::notice::delta: stock $(wc -l </tmp/stock.config) lines, ours $(wc -l </tmp/ours.config) lines, only-stock $(wc -l </tmp/only-stock.txt), only-ours $(wc -l </tmp/only-ours.txt)"
+          # ABI / vermagic relevant subset: the options that make a prebuilt module
+          # refuse to load or corrupt memory if they differ.
+          ABI='^(CONFIG_(SMP|PREEMPT|PREEMPT_NONE|PREEMPT_VOLUNTARY|PREEMPT_DYNAMIC|HZ|HZ_[0-9]+|NR_CPUS|MODULES|MODULE_UNLOAD|MODVERSIONS|MODULE_SIG.*|MODULE_FORCE_LOAD|TRIM_UNUSED_KSYMS|UNUSED_KSYMS_WHITELIST|CFI_CLANG|LTO.*|SHADOW_CALL_STACK|RANDSTRUCT.*|GCC_PLUGIN.*|STRUCTLEAK.*|INIT_ON_ALLOC_DEFAULT_ON|INIT_ON_FREE_DEFAULT_ON|ARM64_4K_PAGES|ARM64_PA_BITS.*|KALLSYMS.*|DEBUG_INFO_BTF|KSU.*|UCLAMP.*|SCHED_CORE|ENERGY_MODEL|PSI|MEMCG|LRU_GEN.*|ARM64_SVE|ARM64_PTR_AUTH.*|ARM64_BTI.*|MITIGATE_SPECTRE.*|RANDOMIZE_BASE)=|# CONFIG_(SMP|PREEMPT|PREEMPT_NONE|PREEMPT_VOLUNTARY|PREEMPT_DYNAMIC|MODULES|MODULE_UNLOAD|MODVERSIONS|MODULE_SIG|MODULE_SIG_FORCE|MODULE_SIG_PROTECT|MODULE_FORCE_LOAD|TRIM_UNUSED_KSYMS|CFI_CLANG|LTO_CLANG|SHADOW_CALL_STACK|RANDSTRUCT|INIT_ON_ALLOC_DEFAULT_ON|INIT_ON_FREE_DEFAULT_ON|UCLAMP_TASK|PSI|MEMCG|LRU_GEN|SCHED_CORE|ENERGY_MODEL|KSU) is not set)'
+          grep -E "$ABI" /tmp/only-stock.txt > /tmp/abi-stock.txt || true
+          grep -E "$ABI" /tmp/only-ours.txt  > /tmp/abi-ours.txt  || true
+          echo "::notice::ABI-relevant delta: $(wc -l </tmp/abi-stock.txt) only-stock, $(wc -l </tmp/abi-ours.txt) only-ours"
+
+      - name: "Delta A: ABI / module-load options the stock kernel has and we do not"
+        run: |
+          head -n 10 /tmp/abi-stock.txt | sed 's/^/::notice::ONLY-STOCK /' || true
+          test -s /tmp/abi-stock.txt || echo "::notice::ONLY-STOCK none"
+
+      - name: "Delta B: ABI / module-load options we have and stock does not"
+        run: |
+          head -n 10 /tmp/abi-ours.txt | sed 's/^/::notice::ONLY-OURS /' || true
+          test -s /tmp/abi-ours.txt || echo "::notice::ONLY-OURS none"
+
+      - name: "Delta C: other options stock enables that we do not (first 10 of y/m)"
+        run: |
+          set -euo pipefail
+          grep -E '^CONFIG_[A-Z0-9_]+=' /tmp/only-stock.txt | grep -vxFf /tmp/abi-stock.txt > /tmp/rest-stock.txt || true
+          echo "::notice::other only-stock (y/m): $(wc -l </tmp/rest-stock.txt)"
+          head -n 9 /tmp/rest-stock.txt | sed 's/^/::notice::ONLY-STOCK /' || true
+
+      - name: "Delta D: other options we enable that stock does not (first 10 of y/m)"
+        run: |
+          set -euo pipefail
+          grep -E '^CONFIG_[A-Z0-9_]+=' /tmp/only-ours.txt | grep -vxFf /tmp/abi-ours.txt > /tmp/rest-ours.txt || true
+          echo "::notice::other only-ours (y/m): $(wc -l </tmp/rest-ours.txt)"
+          head -n 9 /tmp/rest-ours.txt | sed 's/^/::notice::ONLY-OURS /' || true
+
+      - name: "Delta E: the module-signing / KMI picture of both sides"
+        run: |
+          for k in MODVERSIONS TRIM_UNUSED_KSYMS UNUSED_KSYMS_WHITELIST MODULE_SIG_PROTECT PREEMPT_DYNAMIC HZ NR_CPUS LOCALVERSION; do
+            s="$(grep -m1 -E "^(CONFIG_$k=|# CONFIG_$k is not set)" /tmp/stock.config || echo absent)"
+            o="$(grep -m1 -E "^(CONFIG_$k=|# CONFIG_$k is not set)" /tmp/ours.config || echo absent)"
+            echo "::notice::$k | stock: $s | ours: $o"
+          done
