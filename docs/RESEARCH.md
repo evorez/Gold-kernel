@@ -125,3 +125,20 @@ too, unless `crc_stub=true` is explicitly chosen.
   `WildKernels/GKI_KernelSU_SUSFS`, `liu56646/Mi15-Droidspaces-Kernel`,
   `thaomaitam/Build-Kernel-GKI2.0-Susfs`. Device facts:
   `Dhterech/android_device_xiaomi_gold` (LineageOS 23.2 device tree).
+
+
+## Bahar ka cross-check: Star-caorui ka module verification
+
+gold ke vendor modules ko source se rebuild karke stock se compare karne wala
+kaam: [Star-caorui/android_kernel_xiaomi_gold](https://github.com/Star-caorui/android_kernel_xiaomi_gold)
+(branch `OS3.0.5.0.VNQMIXM`, `verify/`). Uske `verify/results.md` ke mutabik 360
+stock vendor modules me se 332 build-id ke alawa byte-identical hain, 15 me
+build-id + stock ke unpublished kernel ke BTF/line-number ka farq hai, 10 me
+code/data identical hai par `.modinfo`/`__versions`/`__kcrctab` thoda alag, aur
+3 (`binder_gki`, `mtk_charger_framework`, `mtk_pep50`) me code ka farq hai.
+
+Humare liye iska seedha faayda: usi kaam me stock GKI build **15511674** ka
+`kernel_aarch64_Module.symvers` milta hai
+(`https://ci.android.com/builds/submitted/15511674/kernel_aarch64/latest/raw/kernel_aarch64_Module.symvers`),
+jo ab build workflow me `stock_symvers_url` ka default hai - isse KMI gate har
+shared symbol ka **CRC** compare karta hai, sirf symbol ka naam nahi.

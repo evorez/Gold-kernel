@@ -22,9 +22,22 @@ ke naam aur `NOTES.txt` sab GoldenEra brand karte hain.
   tweaks fragment par depend nahi — tweaks=false build bhi contract follow karta hai
 - **CI fix**: manual dispatch ab doosri build ko cancel nahi karta (bisection
   parallel chalti hai)
+- **KMI CRC gate ab actually chalta hai**: pehle `stock_symvers_url` khaali tha,
+  isliye gate sirf "symbol gayab hai kya" dekhta tha. Ab default reference =
+  stock GKI build **15511674** ka `kernel_aarch64_Module.symvers`
+  (`ci.android.com`), aur har build me har shared symbol ka **CRC compare** hota
+  hai — mismatch par build fail.
 - **Naye diagnostics**: `bootimg.py config` (stock config extraction),
   `check-stock-images` stock config delta, `config-diff` workflow (stock vs ours,
   annotations me)
+
+## Credits
+
+- **Star-caorui** — gold ke vendor modules ko source se rebuild karke stock se
+  byte-level compare karne wala kaam (`verify/results.md`, 360 modules), aur usi
+  kaam me use hua stock GKI build ka `kernel_aarch64_Module.symvers`
+  (`ci.android.com/builds/submitted/15511674/...`). Isi ne humara KMI CRC gate
+  enable kiya.
 
 ## gold-r17 — pehla build jo phone par **boot hua** ✅
 

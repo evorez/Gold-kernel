@@ -59,7 +59,7 @@ if missing:
         print(f"::error::  {s}")
     print("::error::A missing KMI symbol means prebuilt vendor modules cannot load (black screen).")
     sys.exit(1)
-print(f"    KMI list: all {len(kmilist)} symbols still exported")
+print(f"::notice::KMI list: all {len(kmilist)} symbols still exported")
 
 # --- 2. CRC parity against a reference build -------------------------------
 if ref:
@@ -71,7 +71,7 @@ if ref:
     common = set(ours) & set(theirs)
     bad = sorted(s for s in common if ours[s] != theirs[s])
     gone = sorted(set(theirs) - set(ours))
-    print(f"    reference exports {len(theirs)} symbols, {len(common)} in common")
+    print(f"::notice::reference (stock) exports {len(theirs)} symbols, {len(common)} in common with ours")
     if gone:
         print(f"::error::{len(gone)} symbol(s) exported by the reference build are missing here:")
         for s in gone[:25]:
@@ -88,7 +88,7 @@ if ref:
             print("::error::Either build with the stock config/toolchain (default) or re-run with crc_stub=true.")
             sys.exit(1)
     else:
-        print(f"    CRC parity: all {len(common)} shared symbols identical to the reference build")
+        print(f"::notice::CRC parity: all {len(common)} shared symbols identical to the stock build")
 PY
 
 echo "==> KMI gate passed"
