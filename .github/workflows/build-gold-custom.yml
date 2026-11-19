@@ -43,6 +43,10 @@ on:
         description: "Ftrace/perf development extras (configs/gold-devbuild.config) - debug builds only"
         type: boolean
         default: false
+      publish_release:
+        description: "Attach the build files to a GitHub Release (permanent download link, no 14-day expiry)"
+        type: boolean
+        default: false
       ksu_ref:
         description: "Root repo ref/commit (empty = pinned known-good pair: KSU 64833c00)"
         type: string
@@ -96,6 +100,7 @@ env:
   USE_SUSFS: ${{ inputs.use_susfs }}
   TWEAKS: ${{ inputs.tweaks }}
   DEV_BUILD: ${{ inputs.dev_build }}
+  PUBLISH_RELEASE: ${{ inputs.publish_release }}
   KSU_REF: ${{ inputs.ksu_ref }}
   SUSFS_REF: ${{ inputs.susfs_ref }}
   CRC_STUB: ${{ inputs.crc_stub }}
@@ -109,6 +114,8 @@ jobs:
     name: gold custom (${{ inputs.root_flavor }}, susfs=${{ inputs.use_susfs }}, tweaks=${{ inputs.tweaks }})
     runs-on: ubuntu-latest
     timeout-minutes: 300
+    permissions:
+      contents: write   # only used by the optional release step below
     steps:
       - name: Checkout this repo (scripts + docs)
         uses: actions/checkout@v5
@@ -305,6 +312,26 @@ jobs:
           path: artifacts/
           retention-days: 14
           if-no-files-found: error
+
+      - name: Publish a GitHub Release (optional permanent download)
+        if: ${{ inputs.publish_release }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          TAG="gold-r${{ github.run_number }}"
+          TITLE="gold custom kernel r${{ github.run_number }} (${COMMON_TAG:-android15-6.6}, ${EFFECTIVE_ROOT_FLAVOR:-none})"
+          NOTES="Built from \`${EXPECTED_FULL_SHA}\` (\`${COMMON_TAG}\`, kernel ${EXPECTED_VERSION}, 4 KB pages).
+          root=${EFFECTIVE_ROOT_FLAVOR:-none}, susfs=${EFFECTIVE_USE_SUSFS:-false}, tweaks=${TWEAKS:-false}, dev_build=${DEV_BUILD:-false}.
+          **Not hardware-tested yet** - keep your ROM's stock boot.img. Flash guide: docs/FLASH.md."
+          if gh release view "$TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            echo "release $TAG already exists - uploading assets into it"
+          else
+            gh release create "$TAG" --repo "$GITHUB_REPOSITORY" --title "$TITLE" --notes "$NOTES"
+          fi
+          gh release upload "$TAG" "$GITHUB_WORKSPACE"/artifacts/* --repo "$GITHUB_REPOSITORY" --clobber
+          echo "release URL: https://github.com/$GITHUB_REPOSITORY/releases/tag/$TAG" >>"$GITHUB_STEP_SUMMARY"
+          echo "release: https://github.com/$GITHUB_REPOSITORY/releases/tag/$TAG"
 
       - name: Diagnostics on failure (annotations)
         if: failure()

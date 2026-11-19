@@ -13,6 +13,7 @@ KMI + package <1 min). Budget up to 60 min if the runner is slow.
 | `root_flavor` | `kernelsu` | `kernelsu` (tiann/KernelSU — required for SUSFS), `ksu-next` (KernelSU-Next v3.4.x), `none` (no root) |
 | `use_susfs` | `true` | SUSFS root hiding: susfs4ksu kernel patch **and** its `10_enable_susfs_for_ksu.patch`. Redirected to `kernelsu` when `ksu-next` is chosen (Next only has SUSFS as an LKM). |
 | `tweaks` | `true` | The feature set of `configs/gold-features.config` (schedutil/EAS/uclamp, PSI, memcg, MGLRU, zram algos, ext4/F2FS/EROFS + inline crypto, mq-deadline, pstore, WireGuard, exFAT, NTFS3, HID, BBR+fq) — all built in (`=y`) |
+| `publish_release` | `false` | Publishes the build files as a GitHub **Release** (`gold-r<run>`) instead of only a 14-day Actions artifact. Useful when the build has to survive longer than the artifact retention — phone-friendly download, no login for a public repo. |
 | `dev_build` | `false` | Adds `configs/gold-devbuild.config` (ftrace, dynamic ftrace, kprobe events, perf). Debug only: bigger Image, extra symbols. |
 | `ksu_ref` | *(empty)* | Pin the root repo. Empty = the verified pin (`64833c00` for KernelSU, `v3.4.2` for Next). |
 | `susfs_ref` | `f98f0822` | susfs4ksu commit on branch `gki-android15-6.6`. Its commit message names KernelSU `64833c00` as the synced upstream — the two pins must stay a coherent pair. |
@@ -62,6 +63,8 @@ KMI + package <1 min). Budget up to 60 min if the runner is slow.
 8. **Package** (`scripts/package.sh`) — `boot.img` (header v4, kernel only),
    `AnyKernel3-*.zip`, raw `Image`/`Image.gz`, `NOTES.txt`, `SHA256SUMS.txt`, plus
    `gold-profiles.sh` and `FEATURES.md` so the runtime profiles travel with the build.
+   With `publish_release=true` the same files are attached to a GitHub Release, which
+   is the copy to keep (Actions artifacts expire after 14 days).
 
 ## Artifacts
 
