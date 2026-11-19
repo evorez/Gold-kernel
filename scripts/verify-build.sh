@@ -87,9 +87,9 @@ if [ "${TWEAKS:-false}" = "true" ]; then
     for c in TCP_CONG_BBR NET_SCH_FQ LRU_GEN LRU_GEN_ENABLED; do
         need_y "$c"
     done
-    if ! grep -q '^CONFIG_DEFAULT_TCP_CONG="bbr"$' "$CFG"; then
+    if ! grep -q '^CONFIG_DEFAULT_BBR=y$' "$CFG" || ! grep -q '^CONFIG_DEFAULT_TCP_CONG="bbr"$' "$CFG"; then
         echo "::error::default TCP congestion control is not bbr. In-image value:"
-        grep -E 'CONFIG_(DEFAULT_TCP_CONG|TCP_CONG_ADVANCED|TCP_CONG_BBR)' "$CFG" | while IFS= read -r line; do
+        grep -E 'CONFIG_(DEFAULT_TCP_CONG|DEFAULT_BBR|DEFAULT_CUBIC|TCP_CONG_ADVANCED|TCP_CONG_BBR)' "$CFG" | while IFS= read -r line; do
             esc=$(printf '%s' "$line" | sed -e 's/%/%25/g' -e 's/\r//g')
             echo "::error::  ${esc:0:200}"
         done
