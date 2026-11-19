@@ -1,0 +1,7 @@
+# build outputs (CI builds these outside the repo, but keep local runs clean)
+artifacts/
+dist/
+stock-boot.img
+*.symvers
+__pycache__/
+*.pyc
