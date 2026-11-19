@@ -336,7 +336,8 @@ jobs:
         run: |
           set -euo pipefail
           TAG="gold-r${{ github.run_number }}"
-          TITLE="gold custom kernel r${{ github.run_number }} (${COMMON_TAG:-android15-6.6}, ${EFFECTIVE_ROOT_FLAVOR:-none})"
+          VARIANTS="root=${EFFECTIVE_ROOT_FLAVOR:-none},susfs=${EFFECTIVE_USE_SUSFS:-false},tweaks=${TWEAKS:-false}"
+          TITLE="gold r${{ github.run_number }} - ${VARIANTS} (${COMMON_TAG:-android15-6.6})"
           if [ -f "$GITHUB_WORKSPACE/artifacts/boot.img" ]; then
             BOOTLINE="Includes \`boot.img\`: YOUR stock boot image with only the kernel payload swapped (header/cmdline/ramdisk/tail byte-identical)."
           else
