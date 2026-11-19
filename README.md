@@ -7,7 +7,7 @@ Two workflows, in the order they should be used:
 | Workflow | Purpose | Output |
 |---|---|---|
 | **Build GOLD GKI baseline** (`build-gold-gki.yml`) | Unmodified GKI at the exact build the phone runs — a reference point | raw `Image` + modules, **not** flashable |
-| **Build GOLD custom kernel** (`build-gold-custom.yml`) | The actual custom kernel: root + SUSFS + tweaks | `boot.img`, AnyKernel3 zip, raw `Image` |
+| **Build GOLD custom kernel** (`build-gold-custom.yml`) | The actual custom kernel: root + SUSFS + feature set | raw `Image`/`Image.gz`, AnyKernel3 zip |
 
 ## Device / current kernel (from the phone)
 
