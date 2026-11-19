@@ -88,6 +88,18 @@ jobs:
               print(f"::notice::STOCK {k}: {hit[0] if hit else '(absent)'}")
           PY
 
+      - name: "Stock config A: everything that decides whether vendor modules load"
+        run: |
+          set -euo pipefail
+          grep -E '^(CONFIG_(MODVERSIONS|MODULE_SIG|MODULE_SIG_ALL|MODULE_SIG_FORCE|MODULE_SIG_PROTECT|MODULE_SIG_HASH|MODULE_COMPRESS_NONE|MODULE_FORCE_LOAD|MODULE_UNLOAD|TRIM_UNUSED_KSYMS)=|# CONFIG_(MODVERSIONS|MODULE_SIG|MODULE_SIG_FORCE|MODULE_SIG_PROTECT|MODULE_FORCE_LOAD) is not set)' /tmp/stock.config \
+            | sed 's/^/::notice::STOCK /' || echo "::notice::STOCK (no module-signing options found)"
+
+      - name: "Stock config B: ABI-sensitive scheduler / memory / toolchain options"
+        run: |
+          set -euo pipefail
+          grep -E '^(CONFIG_(LOCALVERSION|LOCALVERSION_AUTO|LRU_GEN|PSI|MEMCG|UCLAMP_TASK|UCLAMP_BUCKETS_COUNT|LTO_NONE|LTO_CLANG|CFI_CLANG|KSU|KPROBES|VMLINUX_MAP)=|# CONFIG_(LRU_GEN|PSI|MEMCG|UCLAMP_TASK|LTO_NONE|CFI_CLANG) is not set)' /tmp/stock.config \
+            | sed 's/^/::notice::STOCK /' || echo "::notice::STOCK (no layout options found)"
+
       - name: Report the layout as annotations (logs are not always reachable)
         run: |
           set -euo pipefail
