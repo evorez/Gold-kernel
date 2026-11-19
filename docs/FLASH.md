@@ -83,6 +83,21 @@ su -c 'dd if=/dev/block/by-name/boot of=/sdcard/stock-boot.img'
 
 ---
 
+## 2C. Ready-made `boot.img` (jab build ne banayi ho)
+
+Agar aapne build ke waqt `boot_img_url` (apne ROM ka `boot.img`) diya, to artifact me
+`boot.img` bhi aati hai — wo **aapki hi stock image** hai jisme sirf kernel payload
+badla gaya hai. Header (cmdline/os_version/page size), ramdisk aur tail (dtb, agar hai)
+**byte-for-byte** wahi hain; CI khud verify karta hai.
+
+```bash
+fastboot flash boot boot.img
+fastboot reboot
+```
+
+Ye fastboot wala sabse seedha raasta hai. AnyKernel3 zip (2A) bhi saath aata hai —
+dono me se koi ek use karo, dono me sirf kernel badalta hai.
+
 ## 2A. Install: AnyKernel3 zip (recommended)
 
 1. `AnyKernel3-*.zip` phone me copy karo.
