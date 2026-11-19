@@ -50,6 +50,10 @@ to keep and the easiest one to download on the phone.
 
 ### Status
 
+**Permanent download:** [`releases/tag/gold-r10`](https://github.com/evorez/Gold-kernel/releases/tag/gold-r10)
+(`boot.img`, AnyKernel3 zip, raw images, `SHA256SUMS.txt`, `gold-profiles.sh`, `FEATURES.md`)
+— built by run `44571462688`, published with `publish_release=true`.
+
 Last full CI build: **run 44558056460 — green** (`main`, 2026-11-19, 15 min 19 s
 end to end, ~11 min of that is Bazel). Artifact: `gold-custom-kernelsu-susfstrue-9`
 (~63 MB: `boot.img` + AnyKernel3 zip + raw images + `SHA256SUMS.txt` +
