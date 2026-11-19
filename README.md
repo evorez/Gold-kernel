@@ -44,6 +44,10 @@ Defaults are the sensible ones (`kernelsu` + SUSFS + tweaks). A build takes ~40�
 
 Artifacts: `boot.img` (fastboot), `AnyKernel3-*.zip` (rooted phone), raw `Image`/`Image.gz`, `SHA256SUMS.txt`.
 
+Actions artifacts expire after 14 days — set **`publish_release: true`** to also attach
+the same files to a GitHub **Release** (`releases/tag/gold-r<run>`), which is the copy
+to keep and the easiest one to download on the phone.
+
 ### Status
 
 Last full CI build: **run 44558056460 — green** (`main`, 2026-11-19, 15 min 19 s
