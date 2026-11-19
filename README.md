@@ -1,6 +1,6 @@
 # GoldenEra — custom kernel for the Redmi Note 13 5G (gold)
 
-**GoldenEra v1** · author **@Evorez** 🥹
+**GoldenEra v1** · author **𝙴𝚅𝙾𝚁𝙴𝚉** 🥹
 Custom-kernel workspace for the **Xiaomi Redmi Note 13 5G** (codename **gold**), driven from GitHub Actions (no PC required — only a phone with a browser).
 
 - Release history / bisection ladder: [`docs/CHANGELOG.md`](docs/CHANGELOG.md)
