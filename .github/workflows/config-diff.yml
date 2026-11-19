@@ -45,9 +45,9 @@ jobs:
             echo "::error::cannot read release ${{ inputs.tag }}: $(echo "$rel" | head -c 300)"
             exit 1
           fi
-          url="$(echo "$rel" | python3 -c 'import json,sys;d=json.load(sys.stdin);print(next((a["url"] for a in d["assets"] if a["name"]=="Image.gz"),""))')"
+          url="$(echo "$rel" | python3 -c 'import json,sys;d=json.load(sys.stdin);print(next((a["url"] for a in d["assets"] if a["name"].startswith("Image-") and a["name"].endswith(".gz")),"")))')"
           if [ -z "$url" ]; then
-            echo "::error::release ${{ inputs.tag }} has no Image.gz asset"
+            echo "::error::release ${{ inputs.tag }} has no Image-*.gz asset"
             echo "$rel" | python3 -c 'import json,sys;[print("::error::asset: "+a["name"]) for a in json.load(sys.stdin)["assets"][:10]]'
             exit 1
           fi
