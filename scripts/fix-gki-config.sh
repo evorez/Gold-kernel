@@ -45,6 +45,16 @@ echo "==> stock-environment parity"
 set_y MODULE_SIG_PROTECT n
 echo "    MODULE_SIG_PROTECT: off (Google-signed system_dlkm modules must load)"
 
+# 1b. The DO-NOT-INCLUDE options are unconditional, not a "tweaks" feature.
+#     A build with tweaks=false otherwise inherits whatever the GKI defconfig
+#     happens to default to - and the stock gold kernel has
+#     CONFIG_THERMAL_WRITABLE_TRIPS=y, so a root-only/parity variant shipped that
+#     option enabled and the policy gate (correctly) failed the build.
+for _opt in THERMAL_WRITABLE_TRIPS CPU_FREQ_DEFAULT_GOV_PERFORMANCE CPU_FREQ_DEFAULT_GOV_USERSPACE; do
+    set_y "$_opt" n
+done
+echo "    DO-NOT-INCLUDE: no writable thermal trips, no performance/userspace default governor"
+
 # 2. LTO must stay NONE, exactly like stock.
 #    A different LTO mode changes codegen and therefore symbol CRCs, and the
 #    prebuilt vendor modules then refuse to load -> black screen. Do not "speed

@@ -23,7 +23,7 @@ nikaalta hai (`check-stock-images`, `config-diff` workflows). 7.7k lines ka diff
 kholne par sirf **12 lines stock-only, 44 lines ours-only** nikli — yaani source
 ek hi hai, humne sirf apne features jaade.
 
-ABI / module-loading ke liye jo maायne rakhta hai:
+ABI / module-loading ke liye jo matlab rakhta hai:
 
 | Option | stock | ours | verdict |
 |---|---|---|---|
