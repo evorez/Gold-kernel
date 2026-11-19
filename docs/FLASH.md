@@ -108,19 +108,20 @@ zaroorat nahi.
 
 ---
 
-## 3. Root activate karna (agar `root_flavor=sukisu` wala build liya hai)
+## 3. Root activate karna (agar `root_flavor=kernelsu` / `ksu-next` build liya hai)
 
-Build me **kernel ke andar** root driver hota hai — isliye Magisk jaisa patching
-nahi karna. Sirf manager app chahiye:
+Build me **kernel ke andar** root driver hota hai — isliye Magisk jaisa boot
+patching nahi karna. Sirf manager app chahiye:
 
-1. **SukiSU Ultra** ka APK install karo
-   (repo: `SukiSU-Ultra/SukiSU-Ultra` ke releases se).
+1. **KernelSU** ka APK install karo (`tiann/KernelSU` releases) — default
+   `root_flavor=kernelsu` isi ke liye hai.
    `root_flavor=ksu-next` build liya ho to **KernelSU-Next** ka APK.
 2. App kholo → status me **"Working" / "Kernel: installed"** dikhna chahiye.
-   Agar "Not installed" dikhe → galat KMI ka kernel flash ho gaya hai (neeche
-   troubleshooting).
-3. SUSFS userspace (optional, hiding ke liye): manager me
-   `susfs`/`susfs4ksu` module zip flash karo, phir reboot.
+   Agar "Not installed" dikhe → galat KMI/version ka kernel flash ho gaya hai
+   (neeche troubleshooting), ya APK kernel ke KSU version se match nahi karta.
+3. SUSFS userspace (hiding ke liye): manager me susfs4ksu ka
+   `ksu_module_susfs` module zip flash karo, phir reboot. Kernel side SUSFS
+   pehle se image me hai (`CONFIG_KSU_SUSFS=y`).
 
 > SUSFS kernel me hai, par usko control karne wala userspace module alag hota hai.
 

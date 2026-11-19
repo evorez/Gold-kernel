@@ -65,14 +65,13 @@ echo "    4K pages, LTO_NONE, CFI_CLANG, MODVERSIONS, MODULE_SIG_PROTECT=off: OK
 
 # Root flavour consistency.
 case "${EFFECTIVE_ROOT_FLAVOR:-none}" in
-    sukisu|ksu-next)
+    kernelsu|ksu-next)
         need_y KSU; echo "    CONFIG_KSU=y"
         if [ "${EFFECTIVE_USE_SUSFS:-false}" = "true" ]; then
             need_y KSU_SUSFS; echo "    CONFIG_KSU_SUSFS=y"
             need_y KSU_SUSFS_SUS_MOUNT; need_y KSU_SUSFS_SUS_KSTAT
             echo "    SUSFS sus_mount + sus_kstat: on"
         fi
-        if [ "${EFFECTIVE_USE_KPM:-false}" = "true" ]; then need_y KPM; echo "    CONFIG_KPM=y"; fi
         ;;
     none)
         if grep -qE '^CONFIG_(KSU|KPM)=[ym]$' "$CFG"; then

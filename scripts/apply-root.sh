@@ -1,29 +1,32 @@
 #!/usr/bin/env bash
 # Integrate a root solution (+ optional SUSFS root hiding) into the GKI tree.
 #
-#   ROOT_FLAVOR=sukisu    SukiSU Ultra, branch `builtin` (carries KSU_SUSFS*
-#                         itself, so SUSFS needs no KSU-side patch)
-#   ROOT_FLAVOR=ksu-next  KernelSU-Next v3.x (no SUSFS - see below)
+#   ROOT_FLAVOR=kernelsu  KernelSU (tiann) + SUSFS - the pair SUSFS is written for
+#   ROOT_FLAVOR=ksu-next  KernelSU-Next v3.4.x, no in-tree SUSFS
 #   ROOT_FLAVOR=none      no root at all
 #
-# Verified facts this encodes (upstream + on-device CI evidence):
-#  * In-tree SUSFS requires SukiSU Ultra. KernelSU-Next v3.4.x ships SUSFS only
-#    as a separate LKM (kernel/susfs -> susfs_guard_lkm.ko, loaded by ksud), so it
-#    cannot be linked into the Image; susfs4ksu's KSU-side patch
-#    (10_enable_susfs_for_ksu.patch) targets weishu's original KernelSU layout:
-#    it deletes hook/lsm_hook.o, hook/syscall_hook_manager.o and
-#    infra/symbol_resolver.o from kernel/Kbuild - exactly the files v3.x is built
-#    on. So ksu-next + susfs is redirected to sukisu, or refused.
-#  * SukiSU `builtin` is required for SUSFS: the release branch has no
-#    KSU_SUSFS* Kconfig symbols, and kconfig would then silently drop every
-#    CONFIG_KSU_SUSFS* line we add.
-#  * SukiSU `builtin` tip is not always buildable (kernel/feature/*.c referencing
-#    functions/enums that do not exist). 6c5603f0 is the newest known-good
-#    revision, so it is pinned by default; the coherence preflight below catches
-#    the same class of breakage in ~1 s instead of 20 min into the build.
-#  * SUSFS is pinned together with KSU on purpose: susfs4ksu commit 3f0b811 began
-#    calling ksu_install_su_fd() from the 50_ patch, which pinned SukiSU trees do
-#    not define ("undefined symbol: ksu_install_su_fd" at link time).
+# Why KernelSU and not SukiSU Ultra (verified against upstream, CI run 44519162981):
+#  * susfs4ksu ships TWO patches: the kernel-side one (50_add_susfs_in_<kmi>.patch)
+#    and the root-side one (KernelSU/10_enable_susfs_for_ksu.patch) which adds the
+#    SUSFS supercall dispatch and the KSU_SUSFS* Kconfig symbols. The latter is
+#    maintained against tiann/KernelSU - that is the pairing upstream tests.
+#  * SukiSU Ultra's `builtin` branch carries its own SUSFS dispatch code in
+#    kernel/supercall/dispatch.c, but it expects the *matching* susfs4ksu headers
+#    (susfs.h / susfs_def.h with selinux-hide helpers, susfs_set_sid, ...). Pin
+#    them wrong and the build dies in dispatch.c:
+#        error: use of undeclared identifier 'CMD_SUSFS_...'
+#        error: call to undeclared function 'susfs_...'
+#    Its tree is also not buildable at every revision, so a coherent
+#    (KernelSU, SUSFS) pair is much easier to guarantee with tiann/KernelSU.
+#  * KernelSU-Next v3.4.x ships SUSFS only as a separate LKM
+#    (kernel/susfs -> susfs_guard_lkm.ko loaded by ksud), so it cannot be linked
+#    into the Image; ksu-next + susfs is therefore redirected to kernelsu.
+#
+# Pins are a coherent pair on purpose:
+#   KernelSU c680b548 = the commit susfs4ksu names as "latest synced KernelSU
+#   commit" in the branch tip's history; SUSFS f98f0822 = branch tip at that sync.
+#   KernelSU at that revision defines ksu_install_su_fd(), which the 50_ patch's
+#   exec.c hunk calls - an older KSU tree fails to link instead.
 #
 # Usage: apply-root.sh <gki-workspace-root>        (expects <root>/common/)
 set -euo pipefail
@@ -31,12 +34,11 @@ set -euo pipefail
 KROOT="${1:?usage: apply-root.sh <repo-root-containing-common/>}"
 KDIR="$KROOT/common"
 DEFCONFIG="$KDIR/arch/arm64/configs/gki_defconfig"
-ROOT_FLAVOR="${ROOT_FLAVOR:-sukisu}"
+ROOT_FLAVOR="${ROOT_FLAVOR:-kernelsu}"
 USE_SUSFS="${USE_SUSFS:-true}"
-USE_KPM="${USE_KPM:-false}"
 KSU_REF="${KSU_REF:-}"
 SUSFS_BRANCH="${SUSFS_BRANCH:-gki-android15-6.6}"
-SUSFS_REF="${SUSFS_REF:-09fec8aa}"
+SUSFS_REF="${SUSFS_REF:-}"
 
 [ -d "$KDIR/drivers" ] || { echo "::error::expected kernel tree at $KDIR"; exit 1; }
 
@@ -58,29 +60,21 @@ fi
 
 # ---------------------------------------------------- flavor/SUSFS compatibility
 if [ "$ROOT_FLAVOR" = "ksu-next" ] && [ "$USE_SUSFS" = "true" ]; then
-    echo "::warning::KernelSU-Next v3.x cannot take the susfs4ksu KSU-side patch;"
-    echo "::warning::switching to SukiSU Ultra, which implements SUSFS natively."
-    echo "::warning::(choose root_flavor=ksu-next + use_susfs=false to stay on Next)"
-    ROOT_FLAVOR=sukisu
-fi
-if [ "$ROOT_FLAVOR" = "ksu-next" ] && [ "$USE_KPM" = "true" ]; then
-    echo "::warning::KPM is a SukiSU feature; KernelSU-Next has no CONFIG_KPM. Ignoring."
-    USE_KPM=false
+    echo "::warning::KernelSU-Next only has SUSFS as a loadable module (not in-tree);"
+    echo "::warning::switching to root_flavor=kernelsu + SUSFS, the pairing susfs4ksu maintains."
+    echo "::warning::(use root_flavor=ksu-next + use_susfs=false to stay on Next)"
+    ROOT_FLAVOR=kernelsu
 fi
 
 # ------------------------------------------------------------- root tree
 case "$ROOT_FLAVOR" in
-  sukisu)
-    KSU_URL="https://github.com/SukiSU-Ultra/SukiSU-Ultra"
-    KSU_REF="${KSU_REF:-6c5603f0}"
+  kernelsu)
+    KSU_URL="https://github.com/tiann/KernelSU"
+    KSU_REF="${KSU_REF:-c680b548f3fe5c19f51e90ce97d6f0ef89594421}"
     KSU_DIR="$KROOT/KernelSU"
     ;;
   ksu-next)
     KSU_URL="https://github.com/KernelSU-Next/KernelSU-Next"
-    # KernelSU-Next has no `stable` branch; pin the newest release tag. Its
-    # SUSFS support is a *separate LKM* (kernel/susfs -> susfs_guard_lkm.ko), not
-    # in-tree code, so it cannot be linked into the Image the way susfs4ksu's
-    # patch can - which is why the SUSFS route stays on SukiSU.
     KSU_REF="${KSU_REF:-v3.4.2}"
     KSU_DIR="$KROOT/KernelSU-Next"
     ;;
@@ -91,7 +85,6 @@ echo "==> integrating $ROOT_FLAVOR (ref: $KSU_REF)"
 rm -rf "$KSU_DIR"
 git clone -q "$KSU_URL" "$KSU_DIR" || { echo "::error::clone of $KSU_URL failed"; exit 1; }
 if ! git -C "$KSU_DIR" checkout -q "$KSU_REF" 2>/dev/null; then
-    # A branch name / tag that only exists on a remote ref.
     git -C "$KSU_DIR" fetch -q --all --tags
     git -C "$KSU_DIR" checkout -q "$KSU_REF" 2>/dev/null || {
         echo "::error::KSU_REF '$KSU_REF' not found in $KSU_URL. Available:"
@@ -101,15 +94,14 @@ if ! git -C "$KSU_DIR" checkout -q "$KSU_REF" 2>/dev/null; then
     }
 fi
 KSU_SHA="$(git -C "$KSU_DIR" rev-parse --short HEAD)"
-echo "    $ROOT_FLAVOR @ $KSU_SHA ($(git -C "$KSU_DIR" rev-parse --abbrev-ref HEAD))"
+echo "    $ROOT_FLAVOR @ $KSU_SHA"
 [ -d "$KSU_DIR/kernel" ] || { echo "::error::$KSU_DIR/kernel missing - unexpected layout"; exit 1; }
 
-# Wire the driver into the kernel the same way upstream's setup.sh does.
-# Relative to common/drivers/, so "../.." is the workspace root where the root
-# repo is cloned. Keep it relative: an absolute link would point outside the
-# Bazel workspace and Kleaf would refuse to follow it.
+# Wire the driver into the kernel the way upstream's setup.sh does. The link is
+# relative to common/drivers, so "../.." is the workspace root: an absolute link
+# would point outside the Bazel workspace and Kleaf would not follow it.
 case "$ROOT_FLAVOR" in
-    sukisu)   ksu_link="../../KernelSU/kernel" ;;
+    kernelsu) ksu_link="../../KernelSU/kernel" ;;
     ksu-next) ksu_link="../../KernelSU-Next/kernel" ;;
 esac
 ln -sfn "$ksu_link" "$KDIR/drivers/kernelsu"
@@ -131,11 +123,9 @@ print("    drivers/Kconfig: source line inserted before the last endmenu")
 KCONF
 fi
 [ -e "$KDIR/drivers/kernelsu" ] || { echo "::error::drivers/kernelsu symlink missing"; exit 1; }
-grep -q kernelsu "$KDIR/drivers/Makefile" || { echo "::error::drivers/Makefile not wired"; exit 1; }
 echo "    driver wired: drivers/kernelsu -> $(readlink "$KDIR/drivers/kernelsu")"
 
 set_y KSU
-if [ "$USE_KPM" = "true" ]; then set_y KPM; fi
 
 # --------------------------------------- preflight: feature subsystem coherence
 # Upstream breakage in kernel/feature/*.c is invisible until drivers/kernelsu is
@@ -163,14 +153,14 @@ done
 if [ -n "$missing" ]; then
     echo "::error::$ROOT_FLAVOR @ $KSU_SHA is not buildable (upstream bug):"
     for m in $missing; do echo "::error::  $m"; done
-    echo "::error::Pin a known-good commit with the ksu_ref input (default 6c5603f0)."
+    echo "::error::Pin a known-good commit with the ksu_ref input."
     exit 1
 fi
 echo "    feature subsystem coherent"
 
 # ------------------------------------------------------------------ SUSFS
 if [ "$USE_SUSFS" = "true" ]; then
-    echo "==> integrating SUSFS (branch $SUSFS_BRANCH, ref: $SUSFS_REF)"
+    echo "==> integrating SUSFS (branch $SUSFS_BRANCH, ref: ${SUSFS_REF:-tip})"
     SUS="/tmp/susfs4ksu"
     rm -rf "$SUS"
     git clone -q -b "$SUSFS_BRANCH" https://gitlab.com/simonpunk/susfs4ksu.git "$SUS" \
@@ -181,16 +171,26 @@ if [ "$USE_SUSFS" = "true" ]; then
         git -C "$SUS" checkout -q --detach "$SUSFS_REF"
     fi
     echo "    susfs @ $(git -C "$SUS" rev-parse --short HEAD)"
+    SUSFS_VER="$(grep -m1 'SUSFS_VERSION' "$SUS/kernel_patches/include/linux/susfs.h" 2>/dev/null | cut -d'"' -f2 || true)"
+    [ -n "$SUSFS_VER" ] && echo "    susfs version: $SUSFS_VER"
 
+    # kernel side: fs/susfs.c, include/linux/susfs{,_def}.h, hooks in fs/*, mm/*, ...
     cp -f "$SUS"/kernel_patches/fs/* "$KDIR/fs/"
     cp -f "$SUS"/kernel_patches/include/linux/* "$KDIR/include/linux/"
-
     KPATCH="$SUS/kernel_patches/50_add_susfs_in_${SUSFS_BRANCH}.patch"
     [ -f "$KPATCH" ] || { echo "::error::missing $KPATCH"; exit 1; }
-    patch -p1 -d "$KDIR" <"$KPATCH" || { echo "::error::SUSFS kernel patch failed"; exit 1; }
+    patch -p1 -d "$KDIR" <"$KPATCH" || { echo "::error::SUSFS kernel patch failed to apply"; exit 1; }
+    echo "    kernel-side patch applied"
+
+    # root side: supercall dispatch + KSU_SUSFS* Kconfig, maintained against
+    # tiann/KernelSU. This is what makes CONFIG_KSU_SUSFS* exist at all.
+    KPATCH_KSU="$SUS/kernel_patches/KernelSU/10_enable_susfs_for_ksu.patch"
+    [ -f "$KPATCH_KSU" ] || { echo "::error::missing $KPATCH_KSU"; exit 1; }
+    patch -p1 -d "$KSU_DIR" <"$KPATCH_KSU" || { echo "::error::SUSFS KernelSU patch failed to apply"; exit 1; }
+    echo "    KernelSU-side patch applied"
 
     grep -q 'KSU_SUSFS' "$KSU_DIR/kernel/Kconfig" \
-        || { echo "::error::$ROOT_FLAVOR tree has no KSU_SUSFS symbols (not the builtin branch?)"; exit 1; }
+        || { echo "::error::$ROOT_FLAVOR tree has no KSU_SUSFS symbols after the patch"; exit 1; }
 
     for c in KSU_SUSFS KSU_SUSFS_SUS_PATH KSU_SUSFS_SUS_MOUNT KSU_SUSFS_SUS_KSTAT \
              KSU_SUSFS_SPOOF_UNAME KSU_SUSFS_ENABLE_LOG KSU_SUSFS_HIDE_KSU_SUSFS_SYMBOLS \
@@ -202,9 +202,9 @@ fi
 
 # ------------------------------------- keep new exports out of the KMI "trim"
 # GKI builds trim exported symbols that are not in android/abi_gki_aarch64 and
-# (strict mode) fail the build when new ones appear. KSU/SUSFS do export a few
-# helpers they need across their own objects. Registering them in the symbol list
-# is additive - stock symbols are untouched, so vendor modules keep their CRCs.
+# (strict mode) fail the build when new ones appear. KSU/SUSFS export a few
+# helpers. Registering them is additive - stock symbols are untouched, so vendor
+# modules keep their CRCs.
 KMI="$KDIR/android/abi_gki_aarch64"
 if [ -f "$KMI" ]; then
     python3 - "$KMI" "$KSU_DIR/kernel" "$KDIR/fs" "$KDIR/include/linux" <<'KMISYMS'
@@ -241,12 +241,11 @@ for s in new[:10]:
 KMISYMS
 fi
 
-echo "==> root integration done ($ROOT_FLAVOR, susfs=$USE_SUSFS, kpm=$USE_KPM)"
+echo "==> root integration done ($ROOT_FLAVOR, susfs=$USE_SUSFS)"
 grep -E '^CONFIG_(KSU|KPM)' "$DEFCONFIG" | sort | sed 's/^/      /'
 
 {
     echo "EFFECTIVE_ROOT_FLAVOR=$ROOT_FLAVOR"
     echo "EFFECTIVE_USE_SUSFS=$USE_SUSFS"
-    echo "EFFECTIVE_USE_KPM=$USE_KPM"
     echo "KSU_SHA=$KSU_SHA"
 } >>"${GITHUB_ENV:-/dev/null}"

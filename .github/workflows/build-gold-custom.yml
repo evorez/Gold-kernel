@@ -6,8 +6,8 @@ name: Build GOLD custom kernel (android15-6.6, 4 KB, root + tweaks)
 #   -> kernel/common android15-6.6-2026-01_r34 = e56cf6b09cca..., 6.6.118, 4 KB pages
 #
 # What makes it "custom":
-#   * root: SukiSU Ultra (default) or KernelSU-Next, built into the Image
-#   * SUSFS root hiding (requires SukiSU Ultra - see scripts/apply-root.sh)
+#   * root: KernelSU (default) or KernelSU-Next, built into the Image
+#   * SUSFS root hiding (susfs4ksu kernel + KernelSU patches, pinned as a pair)
 #   * tweaks: BBR + fq by default, MGLRU, WireGuard, NTFS3, all built in
 #   * kernel name suffixed "...-4k-gold" so a flashed build is identifiable
 #
@@ -24,12 +24,12 @@ on:
   workflow_dispatch:
     inputs:
       root_flavor:
-        description: "Root solution (sukisu = needed for SUSFS)"
+        description: "Root solution (kernelsu = required for SUSFS)"
         type: choice
-        options: [sukisu, ksu-next, none]
-        default: sukisu
+        options: [kernelsu, ksu-next, none]
+        default: kernelsu
       use_susfs:
-        description: "SUSFS root hiding (forced onto sukisu; ignored when root_flavor=none)"
+        description: "SUSFS root hiding (needs kernelsu; ignored when root_flavor=none)"
         type: boolean
         default: true
       tweaks:
@@ -37,13 +37,13 @@ on:
         type: boolean
         default: true
       ksu_ref:
-        description: "Root repo ref/commit (empty = pinned known-good)"
+        description: "Root repo ref/commit (empty = pinned known-good pair)"
         type: string
         default: ""
       susfs_ref:
-        description: "susfs4ksu commit on branch gki-android15-6.6 (empty = branch tip)"
+        description: "susfs4ksu commit on gki-android15-6.6 (empty = branch tip)"
         type: string
-        default: "09fec8aa"
+        default: "f98f08223bbf469cc0a1542166383d253557fc32"
       crc_stub:
         description: "Skip genksyms CRC comparison (only if vendor modules complain)"
         type: boolean
