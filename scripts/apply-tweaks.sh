@@ -51,24 +51,15 @@ do
 done
 
 # --- BBR as the *default* congestion control --------------------------------
-# GKI hardcodes "cubic" as the default; sysctl can change it at runtime, but
-# then it has to be set on every boot. One-line source change, no ABI impact.
+# 6.6 does not hardcode "cubic" in tcp_cong.c any more; the default is the
+# kconfig string CONFIG_DEFAULT_TCP_CONG ("cubic" when unset). Setting it is
+# cleaner than patching the source and cannot break the sysctl path.
+apply 'CONFIG_DEFAULT_TCP_CONG="bbr"'
+echo '    CONFIG_DEFAULT_TCP_CONG="bbr"'
 TCPCONG="$KDIR/net/ipv4/tcp_cong.c"
 if [ -f "$TCPCONG" ]; then
-    if grep -q 'tcp_congestion_default\[TCP_CA_NAME_MAX\] = "cubic"' "$TCPCONG"; then
-        sed -i 's/tcp_congestion_default\[TCP_CA_NAME_MAX\] = "cubic"/tcp_congestion_default[TCP_CA_NAME_MAX] = "bbr"/' "$TCPCONG"
-        grep -q 'TCP_CA_NAME_MAX\] = "bbr"' "$TCPCONG" \
-            || { echo "::error::failed to set BBR as default congestion control"; exit 1; }
-        echo "    default tcp congestion control: bbr"
-    elif grep -q 'TCP_CA_NAME_MAX\] = "bbr"' "$TCPCONG"; then
-        echo "    default tcp congestion control: already bbr"
-    else
-        echo "::error::tcp_congestion_default declaration not found - refusing to guess"
-        exit 1
-    fi
-else
-    echo "::error::missing $TCPCONG"
-    exit 1
+    grep -q 'CONFIG_DEFAULT_TCP_CONG' "$TCPCONG" \
+        || echo "::warning::tcp_cong.c does not reference CONFIG_DEFAULT_TCP_CONG; verify the sysctl default after boot"
 fi
 
 # --- user supplied extra options (workflow input: extra_config) -------------
