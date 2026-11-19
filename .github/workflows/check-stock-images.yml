@@ -40,6 +40,54 @@ jobs:
             echo '```'
           } >>"$GITHUB_STEP_SUMMARY"
 
+      - name: Extract the stock config and list what WE add on top of it
+        run: |
+          set -euo pipefail
+          python3 scripts/bootimg.py config /tmp/stock/boot.img /tmp/stock.config
+          python3 - <<'PY'
+          import sys
+          stock = set(open("/tmp/stock.config", encoding="utf-8", errors="replace").read().splitlines())
+
+          def state(spec):
+              if spec.startswith("!"):
+                  return "off" if f"# {spec[1:]} is not set" in stock else "ON"
+              return "on" if spec in stock else "off"
+
+          added, same, off = [], 0, []
+          for raw in open("configs/gold-features.config", encoding="utf-8"):
+              line = raw.strip()
+              if not line or line.startswith("#"):
+                  continue
+              kind, _, spec = line.partition(" ")
+              spec = spec.strip()
+              want_off = spec.startswith("!")
+              base = spec[1:] if want_off else spec.split("=")[0]
+              now = state(spec) if want_off else ("on" if spec in stock else "off")
+              if want_off:
+                  if now == "off":
+                      same += 1
+                  else:
+                      added.append(f"{base} (we force it OFF, stock has it ON)")
+              elif now == "on":
+                  same += 1
+              else:
+                  added.append(spec)
+              if kind not in ("REQ", "OPT"):
+                  print(f"::warning::unknown marker in the fragment: {line}")
+
+          print(f"::notice::stock config: {len(stock)} lines; {same} of our options already match stock")
+          for a in added[:40]:
+              print(f"::notice::WE ADD: {a}")
+          if len(added) > 40:
+              print(f"::notice::... and {len(added) - 40} more")
+          keys = ("CONFIG_LOCALVERSION", "CONFIG_MODULE_SIG_PROTECT", "CONFIG_MODVERSIONS",
+                  "CONFIG_LRU_GEN", "CONFIG_UCLAMP_TASK", "CONFIG_MODULE_SIG_FORCE",
+                  "CONFIG_DEBUG_INFO_BTF", "CONFIG_KSU")
+          for k in keys:
+              hit = [l for l in stock if l.startswith(k + "=") or l == f"# {k} is not set"]
+              print(f"::notice::STOCK {k}: {hit[0] if hit else '(absent)'}")
+          PY
+
       - name: Report the layout as annotations (logs are not always reachable)
         run: |
           set -euo pipefail

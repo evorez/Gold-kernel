@@ -208,6 +208,53 @@ def verify(new_path, kernel, stock, partition_size=None):
     return 0
 
 
+def extract_config(src, out):
+    """Pull CONFIG_IKCONFIG out of a boot.img (or a raw Image / Image.gz).
+
+    Vendor modules are built against the stock kernel, so knowing the *real* stock
+    config (not our guess at it) is what tells us which of our extra options could
+    change an exported symbol's CRC.
+    """
+    import gzip
+    import zlib
+    # single-member decompression: real images have padding/garbage after the stream
+    # and gzip.decompress() would raise on it
+    def gunzip(b):
+        return zlib.decompressobj(16 + zlib.MAX_WBITS).decompress(b)
+    raw = open(src, "rb").read()
+    payload = raw
+    if raw[:8] == b"ANDROID!":
+        info = inspect(src)
+        start = info["kernel_offset"]
+        size = info["kernel_size"]
+        payload = raw[start:start + size]
+    if payload[:2] == b"\x1f\x8b":
+        try:
+            img = gunzip(payload)
+        except Exception as e:                                   # noqa: BLE001
+            raise SystemExit(f"::error::kernel payload is gzip but will not decompress: {e}")
+    else:
+        img = payload
+    i = img.find(b"IKCFG_ST")
+    if i < 0:
+        raise SystemExit("::error::no IKCFG_ST in the kernel (CONFIG_IKCONFIG disabled) - "
+                         "cannot recover the stock config from this image")
+    start = i + 8
+    if img[start:start + 3] != b"\x1f\x8b\x08":
+        raise SystemExit("::error::IKCFG_ST is not followed by a gzip stream")
+    cfg = gunzip(img[start:])
+    open(out, "wb").write(cfg)
+    keys = ("CONFIG_LOCALVERSION", "LOCALVERSION_AUTO", "LRU_GEN", "PSI", "MEMCG",
+            "MODULE_SIG_PROTECT", "LTO_NONE", "CFI_CLANG", "UCLAMP_TASK", "NTFS3_FS",
+            "WIREGUARD", "MQ_IOSCHED_DEADLINE", "SWAP", "CPU_FREQ_GOV_SCHEDUTIL")
+    print(f"    config extracted: {len(cfg)} bytes -> {out}")
+    for line in cfg.decode("utf-8", "replace").splitlines():
+        if line.startswith("CONFIG_") and any(line.startswith(f"CONFIG_{k}=") or
+                                              line.startswith(f"CONFIG_{k}_") for k in keys):
+            print(f"    {line}")
+    return 0
+
+
 def main(argv):
     if len(argv) < 3:
         raise SystemExit(__doc__)
@@ -216,6 +263,10 @@ def main(argv):
         return int(x) if x else None
     if cmd == "inspect":
         print(json.dumps(inspect(argv[2]), indent=2))
+    elif cmd == "config":
+        if len(argv) < 4:
+            raise SystemExit("usage: bootimg.py config <boot.img|Image|Image.gz> <out.config>")
+        return extract_config(argv[2], argv[3])
     elif cmd == "vendor":
         print(json.dumps(inspect_vendor(argv[2]), indent=2))
     elif cmd == "repack":
