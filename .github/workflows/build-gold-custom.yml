@@ -12,7 +12,9 @@ name: Build GOLD custom kernel (android15-6.6, 4 KB, root + tweaks)
 #     cpusets, PSI, memcg, zram compression algos, MGLRU, ext4/F2FS/EROFS + inline
 #     crypto, mq-deadline, pstore/ramoops, WireGuard, exFAT, NTFS3, gamepad HID,
 #     BBR+fq default) - all built in, no module to push
-#   * kernel name suffixed "...-4k-gold" so a flashed build is identifiable
+#   * kernel name suffixed "...-4k-golden" so a flashed build is identifiable
+#   * project name: GoldenEra (author @Evorez) - appears in the release title,
+#     the zip/boot.img names and NOTES.txt
 #   * deliverables are the kernel itself: Image, Image.gz, AnyKernel3 zip
 #
 # Safety: CI only compiles and packages. Nothing is flashed, and no boot.img is
@@ -103,7 +105,7 @@ env:
   EXPECTED_FULL_SHA: e56cf6b09cca2151bcee244b3d334fb68685ff57
   EXPECTED_VERSION: 6.6.118
   GKI_BUILD_ID: "15511674"
-  KERNEL_NAME: gold-custom
+  KERNEL_NAME: GoldenEra
   ROOT_FLAVOR: ${{ inputs.root_flavor }}
   USE_SUSFS: ${{ inputs.use_susfs }}
   TWEAKS: ${{ inputs.tweaks }}
@@ -324,7 +326,7 @@ jobs:
       - name: Upload artifacts
         uses: actions/upload-artifact@v7
         with:
-          name: gold-custom-${{ inputs.root_flavor }}-susfs${{ inputs.use_susfs }}-${{ github.run_number }}
+          name: GoldenEra-${{ inputs.root_flavor }}-susfs${{ inputs.use_susfs }}-${{ github.run_number }}
           path: artifacts/
           retention-days: 14
           if-no-files-found: error
@@ -337,13 +339,15 @@ jobs:
           set -euo pipefail
           TAG="gold-r${{ github.run_number }}"
           VARIANTS="root=${EFFECTIVE_ROOT_FLAVOR:-none},susfs=${EFFECTIVE_USE_SUSFS:-false},tweaks=${TWEAKS:-false}"
-          TITLE="gold r${{ github.run_number }} - ${VARIANTS} (${COMMON_TAG:-android15-6.6})"
+          TITLE="GoldenEra v1 - r${{ github.run_number }} (${VARIANTS})"
           if [ -f "$GITHUB_WORKSPACE/artifacts/boot.img" ]; then
             BOOTLINE="Includes \`boot.img\`: YOUR stock boot image with only the kernel payload swapped (header/cmdline/ramdisk/tail byte-identical)."
           else
             BOOTLINE="Kernel only (Image / Image.gz / AnyKernel3 zip, no boot.img)."
           fi
-          NOTES="Built from \`${EXPECTED_FULL_SHA}\` (\`${COMMON_TAG}\`, kernel ${EXPECTED_VERSION}, 4 KB pages).
+          NOTES="**GoldenEra v1** for the Redmi Note 13 5G (gold) - by @Evorez.
+
+          Built from \`${EXPECTED_FULL_SHA}\` (\`${COMMON_TAG}\`, kernel ${EXPECTED_VERSION}, 4 KB pages).
           root=${EFFECTIVE_ROOT_FLAVOR:-none}, susfs=${EFFECTIVE_USE_SUSFS:-false}, tweaks=${TWEAKS:-false}, dev_build=${DEV_BUILD:-false}.
           ${BOOTLINE} **Not hardware-tested yet** - keep your ROM's stock boot.img. Install guide: docs/FLASH.md."
           if gh release view "$TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
