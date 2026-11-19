@@ -85,9 +85,13 @@ on:
           - "anykernel"
         default: "anykernel,image"
 
+# Deliberately NOT cancel-in-progress for manual dispatches: bisecting a bootloop
+# means running several variants (root only, tweaks only, stock parity) side by
+# side, and a blanket cancel-in-progress silently killed the variant that was
+# already 15 minutes in. Only superseded PR/push builds get cancelled.
 concurrency:
-  group: gold-custom-${{ github.ref }}
-  cancel-in-progress: true
+  group: gold-custom-${{ github.ref }}-${{ github.event_name }}-${{ inputs.root_flavor }}-${{ inputs.tweaks }}-${{ inputs.use_susfs }}
+  cancel-in-progress: ${{ github.event_name != 'workflow_dispatch' }}
 
 permissions:
   contents: read
