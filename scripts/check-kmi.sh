@@ -46,8 +46,12 @@ ours = load(symvers)
 print(f"    built kernel exports {len(ours)} symbols")
 
 # --- 1. KMI removals -------------------------------------------------------
+def is_meta(line):
+    """KMI lists carry a section header ("[abi_symbol_list]") and # comments."""
+    return line.startswith("#") or (line.startswith("[") and line.endswith("]"))
+
 kmilist = [l.strip() for l in open(kmi_list, encoding="utf-8", errors="replace")
-           if l.strip() and not l.strip().startswith("#")]
+           if l.strip() and not is_meta(l.strip())]
 missing = [s for s in kmilist if s not in ours]
 if missing:
     print(f"::error::{len(missing)} KMI symbol(s) are missing from the built kernel:")
