@@ -37,7 +37,7 @@ Legend
 |---|---|---|
 | Schedutil | ✅ | `CONFIG_CPU_FREQ_GOV_SCHEDUTIL=y` **and** `CONFIG_CPU_FREQ_DEFAULT_GOV_SCHEDUTIL=y` (default governor, asserted in the Image) |
 | EAS | ✅ | `CONFIG_ENERGY_MODEL=y` — the energy model itself comes from the vendor DT, schedutil consumes it |
-| UClamp | ✅ | `CONFIG_UCLAMP_TASK=y`, `CONFIG_UCLAMP_TASK_GROUP=y`, `CONFIG_UCLAMP_BUCKETS_COUNT=5` |
+| UClamp | ✅ | `CONFIG_UCLAMP_TASK=y`, `CONFIG_UCLAMP_TASK_GROUP=y`, `CONFIG_UCLAMP_BUCKETS_COUNT=20` (stock wali value — ABI) |
 | Android cpusets / task profiles | ✅ | `CONFIG_CPUSETS=y`, `CONFIG_CGROUP_SCHED=y` — cpusets + uclamp are what `task_profiles.json` drives (userspace part is stock Android) |
 | MTK FPSGO / GED / PPM / PBM compatibility | 🔧 | These are vendor modules; they work because the scheduler ABI is unchanged. No duplicate/competing implementation is added. |
 | Dynamic CPU + GPU DVFS | ✅ / 🔧 | CPU: schedutil + `PM_DEVFREQ`/`DEVFREQ_THERMAL`; GPU DVFS is MediaTek's (`ged`, `gpufreq`) and stays untouched. |
