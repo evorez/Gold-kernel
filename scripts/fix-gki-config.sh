@@ -70,12 +70,19 @@ for c in KPROBES KALLSYMS KALLSYMS_ALL EXT4_FS; do
 done
 echo "    KPROBES / KALLSYMS(_ALL) / EXT4_FS: on"
 
-# 5. Protected-exports lists must go for GKI android14+ (SUSFS README step 11):
-#    a self-built kernel cannot reproduce Google's protected symbol set, and a
-#    mismatch here is another "module refuses to load" class of failure.
+# 5. Protected-exports lists: KEEP them, do not delete (see why below).
+#    susfs4ksu's README says to remove these files for GKI android14+, because a
+#    self-built kernel cannot reproduce Google's "protected symbol" set and
+#    modules using those symbols get refused. But the file is a *declared input*
+#    of //common:kernel_aarch64 (common/BUILD.bazel: kernel_aarch64's
+#    protected_exports_list), so deleting it fails the build with
+#        ERROR: missing input file '//common:android/abi_gki_protected_exports_aarch64'
+#    (CI run 44515323372 hit exactly that). The gate those lists feed is
+#    CONFIG_MODULE_SIG_PROTECT, which rule 1 already turns off - so the lists are
+#    inert and the WiFi/BT failure mode is covered anyway.
 for f in "$KDIR/android/abi_gki_protected_exports_aarch64" \
          "$KDIR/android/abi_gki_protected_exports_x86_64"; do
-    [ -f "$f" ] && { rm -f "$f"; echo "    removed $(basename "$f")"; }
+    [ -f "$f" ] && echo "    kept $(basename "$f") (declared Bazel input; MODULE_SIG_PROTECT=off makes it inert)"
 done
 
 # 6. Kernel name, so a flashed build is identifiable:

@@ -61,7 +61,7 @@ Ground truth: the GKI config of the same tag (6.6.118). The rules are enforced b
 | `CONFIG_MODULE_SIG_FORCE` | *not set* | *not set* | good news: signature enforcement cannot block the stock modules |
 | `CONFIG_ARM64_4K_PAGES` | `y` | `y` | page-size mismatch with the vendor partitions does not boot |
 | `CONFIG_KPROBES`, `KALLSYMS_ALL` | `y` | `y` | KernelSU runtime symbol resolution |
-| `android/abi_gki_protected_exports_*` | present | removed | susfs4ksu README step 11 for GKI android14+: a self-built kernel cannot reproduce Google's protected set |
+| `android/abi_gki_protected_exports_*` | present | **kept** | susfs4ksu says to delete them, but they are a declared input of `//common:kernel_aarch64` — deleting fails the build (CI run 44515323372). The gate they feed is `MODULE_SIG_PROTECT`, which is off, so they are inert |
 | `CONFIG_LOCALVERSION` | `"-4k"` | `"-4k-gold"` | only the first vermagic token (release string) changes, and it is skipped when CRCs are present — so this is safe and makes a flashed build identifiable |
 
 The KMI safety net is `scripts/check-kmi.sh`: symbol **removal** is always fatal;
