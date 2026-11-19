@@ -51,8 +51,18 @@ jobs:
             echo "$rel" | python3 -c 'import json,sys;[print("::error::asset: "+a["name"]) for a in json.load(sys.stdin)["assets"][:10]]'
             exit 1
           fi
-          curl -fsSL -H "Authorization: Bearer $GH_TOKEN" -H "Accept: application/octet-stream" -o /tmp/ours-Image.gz "$url"
-          echo "::notice::ours: $(stat -c%s /tmp/ours-Image.gz) bytes (${{ inputs.tag }})"
+          if ! out="$(curl -sSL --retry 3 --max-time 300 -w '%{http_code} %{size_download}' \
+                        -H "Authorization: Bearer $GH_TOKEN" -H "Accept: application/octet-stream" \
+                        -o /tmp/ours-Image.gz "$url" 2>&1)"; then
+            echo "::error::asset download failed for $url: $(echo "$out" | tail -c 300)"
+            exit 1
+          fi
+          size="$(stat -c%s /tmp/ours-Image.gz)"
+          if [ "$size" -lt 1000000 ]; then
+            echo "::error::asset download returned only $size bytes (http: $out)"
+            exit 1
+          fi
+          echo "::notice::ours: $size bytes (${{ inputs.tag }}, http: $out)"
 
       - name: Extract both configs and build the delta
         run: |
