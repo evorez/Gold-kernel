@@ -23,10 +23,11 @@
 #    into the Image; ksu-next + susfs is therefore redirected to kernelsu.
 #
 # Pins are a coherent pair on purpose:
-#   KernelSU c680b548 = the commit susfs4ksu names as "latest synced KernelSU
-#   commit" in the branch tip's history; SUSFS f98f0822 = branch tip at that sync.
-#   KernelSU at that revision defines ksu_install_su_fd(), which the 50_ patch's
-#   exec.c hunk calls - an older KSU tree fails to link instead.
+#   KernelSU 64833c00 = the commit susfs4ksu's tip (f98f0822) names as its synced
+#   upstream ("feat(kernel): Add LSM hook for inode_setxattr", the hook the SUSFS
+#   selinux patches build on); SUSFS f98f0822 = that branch tip. KernelSU at that
+#   revision also defines ksu_install_su_fd(), which the 50_ patch's exec.c hunk
+#   calls - an older KSU tree fails to link instead.
 #
 # Usage: apply-root.sh <gki-workspace-root>        (expects <root>/common/)
 set -euo pipefail
@@ -70,7 +71,7 @@ fi
 case "$ROOT_FLAVOR" in
   kernelsu)
     KSU_URL="https://github.com/tiann/KernelSU"
-    KSU_REF="${KSU_REF:-c680b548f3fe5c19f51e90ce97d6f0ef89594421}"
+    KSU_REF="${KSU_REF:-64833c005eca6a8dc3d73ec2d37d84c37e0d9ad2}"
     KSU_DIR="$KROOT/KernelSU"
     ;;
   ksu-next)
@@ -186,7 +187,20 @@ if [ "$USE_SUSFS" = "true" ]; then
     # tiann/KernelSU. This is what makes CONFIG_KSU_SUSFS* exist at all.
     KPATCH_KSU="$SUS/kernel_patches/KernelSU/10_enable_susfs_for_ksu.patch"
     [ -f "$KPATCH_KSU" ] || { echo "::error::missing $KPATCH_KSU"; exit 1; }
-    patch -p1 -d "$KSU_DIR" <"$KPATCH_KSU" || { echo "::error::SUSFS KernelSU patch failed to apply"; exit 1; }
+    if ! patch -p1 -d "$KSU_DIR" <"$KPATCH_KSU"; then
+        echo "::error::SUSFS KernelSU patch failed to apply against $ROOT_FLAVOR @ $KSU_SHA."
+        echo "::error::The two pins must be a coherent pair: the SUSFS commit names its"
+        echo "::error::synced KernelSU commit in its message - set ksu_ref to that commit."
+        for rej in "$KSU_DIR"/*.rej "$KSU_DIR"/kernel/*.rej; do
+            [ -f "$rej" ] || continue
+            echo "::error::rejects in ${rej#$KSU_DIR/}:"
+            head -12 "$rej" | while IFS= read -r line; do
+                esc=$(printf '%s' "$line" | sed -e 's/%/%25/g' -e 's/\r//g')
+                echo "::error::  ${esc:0:200}"
+            done
+        done
+        exit 1
+    fi
     echo "    KernelSU-side patch applied"
 
     grep -q 'KSU_SUSFS' "$KSU_DIR/kernel/Kconfig" \
