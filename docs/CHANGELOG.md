@@ -1,6 +1,7 @@
 # Changelog — GoldenEra
 
-Redmi Note 13 5G (**gold**) · author **𝙴𝚅𝙾𝚁𝙴𝚉** 🥹
+Redmi Note 13 5G (**gold**) · author **𝙴𝚅𝙾𝚁𝙴𝚉**
+
 Har entry ek GitHub Actions run se bani release hai (`gold-r<N>`), teeno variants
 (`root`, `susfs`, `tweaks`) ke saath. Sab kuch aapki hi stock `boot.img` +
 `vendor_boot` par, sirf kernel payload swap.
