@@ -46,12 +46,17 @@ Artifacts: `boot.img` (fastboot), `AnyKernel3-*.zip` (rooted phone), raw `Image`
 
 ### Status
 
-Last full CI build: **run 44540769002 — green** (`main`, 2026-11-19, 22 min end to end,
-~11 min of that is Bazel). Artifact: `gold-custom-kernelsu-susfstrue-8`
-(`boot.img` + AnyKernel3 zip + raw images + `SHA256SUMS.txt`).
+Last full CI build: **run 44558056460 — green** (`main`, 2026-11-19, 15 min 19 s
+end to end, ~11 min of that is Bazel). Artifact: `gold-custom-kernelsu-susfstrue-9`
+(~63 MB: `boot.img` + AnyKernel3 zip + raw images + `SHA256SUMS.txt` +
+`gold-profiles.sh` + `FEATURES.md`).
 
-- Kernel side is verified by the pipeline itself: source pinned to `e56cf6b09cca`,
-  config read back **out of the built Image**, KMI list intact.
+- The pipeline verifies its own output: source pinned to `e56cf6b09cca`, the config
+  read back **out of the built Image** satisfied all **48 required** feature options
+  (and all 20 optional ones), the policy gate passed, and the KMI list is intact.
+  (Previous green run: `44540769002`, root-only feature set.)
+- Policy gate warnings on this run were exactly the vendored SUSFS hunks
+  (`mm/memory.c`, `block/ioprio.c`) — reported, not silently allowed.
 - **Not flashed on hardware yet.** The first flash is the acceptance test — keep
   your ROM's stock `boot.img`.
 - Two optional inputs make the first flash safer: `stock_boot_url` (copies
