@@ -242,8 +242,13 @@ for path in targets:
         continue
 
 lines = open(kmi, encoding="utf-8").read().splitlines()
-comments = [l for l in lines if l.strip().startswith("#")]
-symbols = {l.strip() for l in lines if l.strip() and not l.strip().startswith("#")}
+
+def is_meta(line):
+    """Keep the list's own furniture: "[abi_symbol_list]" header and # comments."""
+    return line.startswith("#") or (line.startswith("[") and line.endswith("]"))
+
+comments = [l for l in lines if is_meta(l.strip())]
+symbols = {l.strip() for l in lines if l.strip() and not is_meta(l.strip())}
 new = sorted(found - symbols)
 if new:
     # Keep the list sorted: Kleaf diffs this file against the built export table.
