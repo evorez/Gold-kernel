@@ -13,7 +13,7 @@ the kernel never reached userspace.
 2. **Source sha** — built from `android15-6.6-2026-01_r34` (`e56cf6b09cca…`, 6.6.118),
    the same commit that is in stock's `uname -r`.
 3. **The vermagic release string** — with `CONFIG_MODVERSIONS=y` the kernel does *not*
-   compare the release string, only the flags. So the `-4k-GoldenEra-PERF` suffix cannot
+   compare the release string, only the flags. So the `-4k-HAVOC` suffix cannot
    by itself make the vendor modules refuse to load.
 
 ## The stock config (recovered from the user's own boot.img)

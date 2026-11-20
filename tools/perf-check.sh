@@ -1,5 +1,5 @@
 #!/system/bin/sh
-# perf-check - dump the state that the Golden Era PERF work actually touches.
+# perf-check - dump the state that the HAVOC work actually touches.
 #
 # Why this exists: the only honest way to talk about performance on this device is
 # to compare two dumps taken from the same phone under the same conditions. This

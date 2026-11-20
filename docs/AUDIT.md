@@ -1,6 +1,6 @@
-# Golden Era PERF — 101-point audit
+# HAVOC — 101-point audit
 
-Project: **Golden Era PERF** · device: Xiaomi Redmi Note 13 5G (**gold**) · one kernel,
+Project: **HAVOC** · device: Xiaomi Redmi Note 13 5G (**gold**) · one kernel,
 one root implementation (BakaSU builtin), performance-focused.
 This file maps the 101 requirements to what is **implemented**, **preserved**,
 **unsupported**, or **untested**. Nothing here is a benchmark claim.
@@ -12,7 +12,7 @@ Statuses: `IMPL` implemented/verified in the build · `PRES` stock behaviour pre
 ## Project and honesty
 
 - **001** act as an ARM64/GKI kernel engineer — the whole repo is that record (`docs/CHANGELOG.md`, `docs/RESEARCH.md`, `docs/BOOTLOOP.md`). `IMPL`
-- **002** project name exactly *Golden Era PERF* — release title, `NOTES`, docs. `IMPL`
+- **002** project name exactly *HAVOC* — release title, `NOTES`, docs, and inside the kernel (`uname -r` ends in `-HAVOC`). `IMPL`
 - **003** target: Redmi Note 13 5G, `gold` — asserted before every build (`device check`). `IMPL`
 - **004** one final performance kernel, no flavour zoo — the workflow exposes a single `root_flavor` (`bakasu`); one release, one kernel. `IMPL`
 - **005** builtin BakaSU, one coherent root — `CONFIG_KSU=y`, only BakaSU compiled in. `IMPL`
@@ -115,7 +115,7 @@ Statuses: `IMPL` implemented/verified in the build · `PRES` stock behaviour pre
 - **081** no sanitizers/debug logging in the artifact — `dev_build` defaults to false. `IMPL`
 - **082** keep crash logging/observability — `pstore`, `ramoops`, console logging kept. `IMPL`
 - **083** reproducible build script, stops on errors, records logs — every step is `set -euo pipefail`; `/tmp/bazel.log` is now uploaded with the artifacts. `IMPL`
-- **084** brand Golden Era PERF without breaking module matching — release string `-4k-GoldenEra-PERF`; with CRCs present the loader compares only the vermagic flags, not the release string (`same_magic()`), and r27 already booted with a changed release string. CRC gate still enforces all 9444 symbols. `IMPL`
+- **084** brand HAVOC (in `uname -r` too) without breaking module matching — release string `-4k-HAVOC`; with CRCs present the loader compares only the vermagic flags, not the release string (`same_magic()`), and r27 already booted with a changed release string. CRC gate still enforces all 9444 symbols. `IMPL`
 - **085** package only after device/format/compatibility checks — device check, config read-back, policy gate, KMI gate, packaging assertions all run before upload. `IMPL`
 
 ## Measurement and testing
@@ -144,7 +144,7 @@ Statuses: `IMPL` implemented/verified in the build · `PRES` stock behaviour pre
 
 ## Honest summary
 
-Delivered: one kernel, `GoldenEra-PERF`, stock ACK source `e56cf6b09cca`, 6.6.118, 4 KB
+Delivered: one kernel, `HAVOC`, stock ACK source `e56cf6b09cca`, 6.6.118, 4 KB
 pages, BakaSU `v4.2.0-rc3` builtin, 9444/9444 KMI CRC parity, feature set from
 `configs/gold-features.config`, runtime profiles plus a state dump tool.
 
@@ -154,7 +154,7 @@ Blockers:
 - GPU OC cannot be implemented in a GKI Image: OPP tables, DVFS and firmware are in
   `mali_kbase_mt6833_r49.ko` (vendor).
 - Kernel-side input boost needs vendor touch integration, not a GKI change.
-- BakaSU flavor and the `-GoldenEra-PERF` release string are **not boot-tested**; the
+- BakaSU flavor and the `-HAVOC` release string are **not boot-tested**; the
   last boot-confirmed build was the KernelSU+SUSFS one (`-4k-golden`).
 
 ## Device data still needed (one dump, all of it)

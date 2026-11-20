@@ -12,7 +12,7 @@ name: Build GOLD custom kernel (android15-6.6, 4 KB, root + tweaks)
 #     cpusets, PSI, memcg, zram compression algos, MGLRU, ext4/F2FS/EROFS + inline
 #     crypto, mq-deadline, pstore/ramoops, WireGuard, exFAT, NTFS3, gamepad HID,
 #     BBR+fq default) - all built in, no module to push
-#   * kernel name suffixed "...-4k-GoldenEra-PERF" so a flashed build is identifiable
+#   * kernel name suffixed "...-4k-HAVOC" so a flashed build is identifiable
 #   * project name: GoldenEra (author 𝙴𝚟𝚘𝚛𝚎𝚣) - appears in the release title,
 #     the zip/boot.img names and NOTES.txt
 #   * deliverables are the kernel itself: Image, Image.gz, AnyKernel3 zip
@@ -30,7 +30,7 @@ on:
   workflow_dispatch:
     inputs:
       root_flavor:
-        description: "Root solution. Golden Era PERF ships ONE kernel: BakaSU builtin (CONFIG_KSU=y). Other values remain in scripts/apply-root.sh for bisection only."
+        description: "Root solution. HAVOC ships ONE kernel: BakaSU builtin (CONFIG_KSU=y). Other values remain in scripts/apply-root.sh for bisection only."
         type: choice
         options: [bakasu]
         default: bakasu
@@ -53,7 +53,7 @@ on:
       release_tag:
         description: "Release to publish into. One stable tag holds exactly the newest kernel; older gold-* releases are pruned automatically"
         type: string
-        default: "gold-perf"
+        default: "havoc"
       ksu_ref:
         description: "Root repo ref/commit (empty = pinned known-good pair: KSU 64833c00)"
         type: string
@@ -372,9 +372,9 @@ jobs:
           TAG="${TAG:-gold-latest}"
           FLAVOR="${EFFECTIVE_ROOT_FLAVOR:-none}"
           VARIANTS="root=${FLAVOR},susfs=${EFFECTIVE_USE_SUSFS:-false},tweaks=${TWEAKS:-false}"
-          TITLE="Golden Era PERF · 𝙴𝚟𝚘𝚛𝚎𝚣 • 6.6.118"
+          TITLE="HAVOC · 𝙴𝚟𝚘𝚛𝚎𝚣 • 6.6.118"
 
-          # Golden Era PERF ships a single kernel, so the assets keep their plain names
+          # HAVOC ships a single kernel, so the assets keep their plain names
           # (boot.img, Image-..., AnyKernel3-...zip): there is nothing to disambiguate.
           stage=/tmp/release-stage
           rm -rf "$stage"; mkdir -p "$stage"
@@ -404,9 +404,9 @@ jobs:
           # Regenerate the body from what is actually attached, so the release lists
           # every flavor currently inside it (this build is the one that just landed).
           {
-            echo "**Golden Era PERF** for the Redmi Note 13 5G (gold) - by 𝙴𝚟𝚘𝚛𝚎𝚣."
+            echo "**HAVOC** for the Redmi Note 13 5G (gold) - by 𝙴𝚟𝚘𝚛𝚎𝚣."
             echo
-            echo "Built from \`${EXPECTED_FULL_SHA}\` (\`${COMMON_TAG}\`, kernel ${EXPECTED_VERSION}, 4 KB pages, \`-4k-GoldenEra-PERF\`)."
+            echo "Built from \`${EXPECTED_FULL_SHA}\` (\`${COMMON_TAG}\`, kernel ${EXPECTED_VERSION}, 4 KB pages, \`-4k-HAVOC\`)."
             echo
             # plain list, no tables
             gh release view "$TAG" --repo "$GITHUB_REPOSITORY" --json assets --jq '.assets[].name' \

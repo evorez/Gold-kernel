@@ -113,7 +113,7 @@ fastboot) instead.
 ### Check after flashing from recovery
 
 ```bash
-adb shell uname -r     # should end in …-4k-GoldenEra-PERF
+adb shell uname -r     # should end in …-4k-HAVOC
 ```
 
 ## 2C. Ready-made `boot.img` (produced by the build)
@@ -228,7 +228,7 @@ recovery on MTK) — which is why having the stock boot.img is the biggest insur
 
 ```bash
 adb shell uname -r
-# 6.6.118-android15-8-...-4k-GoldenEra-PERF   (our suffix at the end)
+# 6.6.118-android15-8-...-4k-HAVOC   (our suffix at the end)
 ```
 
 Root check:

@@ -193,7 +193,7 @@ chmod +x "$OUTDIR/gold-profiles.sh" "$OUTDIR/perf-check.sh" 2>/dev/null || true
 
 # ------------------------------------------------------------------- notes
 {
-    echo "Golden Era PERF · 𝙴𝚟𝚘𝚛𝚎𝚣 • 6.6.118"
+    echo "HAVOC · 𝙴𝚟𝚘𝚛𝚎𝚣 • 6.6.118"
     echo "custom kernel for the Redmi Note 13 5G (gold)"
     echo "kernel: $KVER"
     echo "built:  $(date -u +%Y-%m-%dT%H:%M:%SZ)"
