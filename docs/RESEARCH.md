@@ -127,18 +127,18 @@ too, unless `crc_stub=true` is explicitly chosen.
   `Dhterech/android_device_xiaomi_gold` (LineageOS 23.2 device tree).
 
 
-## Bahar ka cross-check: Star-caorui ka module verification
+## Outside cross-check: Star-caorui's module verification
 
-gold ke vendor modules ko source se rebuild karke stock se compare karne wala
-kaam: [Star-caorui/android_kernel_xiaomi_gold](https://github.com/Star-caorui/android_kernel_xiaomi_gold)
-(branch `OS3.0.5.0.VNQMIXM`, `verify/`). Uske `verify/results.md` ke mutabik 360
-stock vendor modules me se 332 build-id ke alawa byte-identical hain, 15 me
-build-id + stock ke unpublished kernel ke BTF/line-number ka farq hai, 10 me
-code/data identical hai par `.modinfo`/`__versions`/`__kcrctab` thoda alag, aur
-3 (`binder_gki`, `mtk_charger_framework`, `mtk_pep50`) me code ka farq hai.
+An independent project rebuilds gold's vendor modules from source and compares them
+with stock: [Star-caorui/android_kernel_xiaomi_gold](https://github.com/Star-caorui/android_kernel_xiaomi_gold)
+(branch `OS3.0.5.0.VNQMIXM`, `verify/`). Per its `verify/results.md`, of 360 stock
+vendor modules 332 are byte-identical apart from the build ID, 15 differ by build ID
+plus the BTF/line numbers of stock's unpublished kernel, 10 have identical code and
+data but a slightly different `.modinfo`/`__versions`/`__kcrctab`, and 3
+(`binder_gki`, `mtk_charger_framework`, `mtk_pep50`) differ in code.
 
-Humare liye iska seedha faayda: usi kaam me stock GKI build **15511674** ka
-`kernel_aarch64_Module.symvers` milta hai
+The direct benefit for us: that same work yields the stock GKI build **15511674**
+`kernel_aarch64_Module.symvers`
 (`https://ci.android.com/builds/submitted/15511674/kernel_aarch64/latest/raw/kernel_aarch64_Module.symvers`),
-jo ab build workflow me `stock_symvers_url` ka default hai - isse KMI gate har
-shared symbol ka **CRC** compare karta hai, sirf symbol ka naam nahi.
+which is now the default `stock_symvers_url` in the build workflow — so the KMI gate
+compares the **CRC** of every shared symbol, not just its name.

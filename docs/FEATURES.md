@@ -14,11 +14,11 @@ Legend
 | 🔀 | optional, behind a workflow input |
 | ⛔ | refused by design, enforced by `scripts/check-policy.sh` |
 
-> Short version (Hinglish): jo kernel image me ho sakta hai wo **config** se aa raha
-> hai; MTK ka FPSGO/GED/thermal/UFS/charging in sab **vendor modules** me rehta hai
-> jo phone par already hain — hum unhe todte nahi (KMI gate), duplicate nahi karte.
+> Short version: whatever can live in a kernel image comes from **config**; MTK's
+> FPSGO/GED/thermal/UFS/charging all live in **vendor modules** that already exist on
+> the phone — we neither break them (KMI gate) nor duplicate them.
 > Kuch cheezein **runtime** hain (profiles), aur "DO NOT" list ko build **fail** kar
-> ke enforce karta hai.
+> enforces that.
 
 ---
 

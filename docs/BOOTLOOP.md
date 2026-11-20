@@ -1,29 +1,29 @@
-# Bootloop diagnosis (r14 ke baad)
+# Bootloop diagnosis (after r14)
 
-r14 recovery zip `boot_b` par flash hua — device check `gold` pass, log me
-`Installing GoldenEra 6.6.118-android15-8-maybe-dirty-4k-GoldenEra-v1-gold … Done` bhi aaya —
-par phone **bootloop** kar gaya aur stock boot wapas flash karne par thik hua.
-Matlab: flash theek tha, kernel userspace tak nahi pahuncha.
+The r14 recovery zip flashed to `boot_b` — device check `gold` passed, the log said
+`Installing GoldenEra 6.6.118-...-4k-golden … Done` — and the phone then
+**bootlooped**. Flashing the stock boot back fixed it. So the flash itself was fine:
+the kernel never reached userspace.
 
-## Kya already rule out ho gaya
+## What is already ruled out
 
-1. **Packaging** — boot.img/zip ka structure CI me byte-assert hota hai: header
-   sirf `kernel_size` me badla, ramdisk 0, tail 0 (dtb `vendor_boot` me hai aur
-   waisa hi rehta hai), kernel payload ka sha256 `Image.gz` ke barabar.
-2. **Source sha** — build `android15-6.6-2026-01_r34` (`e56cf6b09cca…`, 6.6.118)
-   se, jo stock ke `uname -r` me bhi hai.
-3. **Vermagic ka release string** — `CONFIG_MODVERSIONS=y` hone par kernel
-   release string ko match *nahi* karta, sirf flags. Isliye `-4k-GoldenEra-v1` suffix
-   apne aap me vendor modules reject nahi kara sakta.
+1. **Packaging** — the boot.img/zip structure is byte-asserted in CI: the header
+   differs only in `kernel_size`, ramdisk is 0, tail is 0 (the dtb lives in
+   `vendor_boot` and is untouched), and the kernel payload's sha256 equals `Image.gz`.
+2. **Source sha** — built from `android15-6.6-2026-01_r34` (`e56cf6b09cca…`, 6.6.118),
+   the same commit that is in stock's `uname -r`.
+3. **The vermagic release string** — with `CONFIG_MODVERSIONS=y` the kernel does *not*
+   compare the release string, only the flags. So the `-4k-GoldenEra-v1` suffix cannot
+   by itself make the vendor modules refuse to load.
 
-## Stock config (aapki boot.img se nikaala gaya)
+## The stock config (recovered from the user's own boot.img)
 
-`scripts/bootimg.py config` stock `boot.img` ke `IKCFG_ST` block se asli config
-nikaalta hai (`check-stock-images`, `config-diff` workflows). 7.7k lines ka diff
-kholne par sirf **12 lines stock-only, 44 lines ours-only** nikli — yaani source
-ek hi hai, humne sirf apne features jaade.
+`scripts/bootimg.py config` pulls the real config out of the stock `boot.img`'s
+`IKCFG_ST` block (`check-stock-images` and `config-diff` workflows). Opening up the
+7.7k-line diff left only **12 stock-only lines and 44 ours-only lines** — the same
+source, we only added our own features.
 
-ABI / module-loading ke liye jo matlab rakhta hai:
+What matters for ABI / module loading:
 
 | Option | stock | ours | verdict |
 |---|---|---|---|
@@ -33,35 +33,29 @@ ABI / module-loading ke liye jo matlab rakhta hai:
 | `CONFIG_HZ` | `250` | `250` | ✅ same |
 | `CONFIG_NR_CPUS` | `32` | `32` | ✅ same |
 | `CONFIG_PREEMPT_DYNAMIC` | off | off | ✅ same |
-| `CONFIG_MODULE_SIG_PROTECT` | `y` | off | ⚠️ jaan-boojh kar (Google-signed modules load karne ke liye) |
-| `CONFIG_UCLAMP_BUCKETS_COUNT` | `20` | **`5`** | ❌ **ABI change — fix ho gaya** |
-| `CONFIG_THERMAL_WRITABLE_TRIPS` | `y` | off | jaan-boojh kar (DO NOT INCLUDE) |
+| `CONFIG_MODULE_SIG_PROTECT` | `y` | off | ⚠️ deliberate (so Google-signed modules load) |
+| `CONFIG_UCLAMP_BUCKETS_COUNT` | `20` | **`5`** | ❌ **ABI change — fixed** |
+| `CONFIG_THERMAL_WRITABLE_TRIPS` | `y` | off | deliberate (DO NOT INCLUDE) |
 
-`CONFIG_UCLAMP_BUCKETS_COUNT=5` `struct rq` ke andar uclamp arrays ka size badal
-deta hai; vendor scheduler modules (FPSGO/GED/PPM/PBM) stock layout ke against
-bane hain. Isliye ab `20` — stock wali value.
+`CONFIG_UCLAMP_BUCKETS_COUNT=5` changes the size of the uclamp arrays inside
+`struct rq`; the vendor scheduler modules (FPSGO/GED/PPM/PBM) were built against the
+stock layout. It is `20` now — the stock value.
 
-## Bisection (abhi chal raha hai)
+## The bisection (record)
 
-Teen variants, teeno aapki hi stock `boot.img` + `vendor_boot` se, sirf
-features/root ka farq:
+Three variants, all from the user's own stock `boot.img` + `vendor_boot`, differing
+only in features/root:
 
-| Variant | root | SUSFS | tweaks | Kya test karta hai |
+| Variant | root | SUSFS | tweaks | What it tests |
 |---|---|---|---|---|
-| **P** parity | none | — | off | Build pipeline + packaging + stock-ABI config |
-| **R** root only | KernelSU | on | off | KSU + SUSFS patches (leading suspect) |
-| **T** tweaks only | none | — | on | Poora feature set (uclamp ab 20) |
+| **P** parity | none | — | off | build pipeline + packaging + stock-ABI config |
+| **R** root only | KernelSU | on | off | the KSU + SUSFS patches |
+| **T** tweaks only | none | — | on | the whole feature set (uclamp now 20) |
 
-Flash kram: **P → (boots?) → R → T**. Har flash ke baad rollback taiyar rakhein:
+Result: **T booted** (r17) → the pipeline and the feature set are fine;
+**R booted** (r22 → r27) → KernelSU + SUSFS are fine too. Rollback during any test:
 
 ```bash
-fastboot flash boot <aapka stock boot.img>
-# ya KernelFlasher → Restore
+fastboot flash boot <your stock boot.img>
+# or KernelFlasher → Restore
 ```
-
-Natija:
-- P boot karta hai → packaging/pipeline saaf; culprit R ya T me hai.
-- P bhi bootloop karta hai → problem baseline build/toolchain me hai (features
-  ya root me nahi) aur wahi pehle dekhna hoga.
-- R bootloop / T boot → KSU/SUSFS patch hi culprit.
-- R boot / T bootloop → feature set me se koi ek option (crypto/NTFS3/BBR/PSI…).

@@ -328,7 +328,7 @@ jobs:
             echo "| boot.img | $([ -f "$GITHUB_WORKSPACE/artifacts/boot.img" ] && echo "included - repacked from the supplied stock image (header/dtb/ramdisk untouched)" || echo "not built (kernel only)") |"
             echo "| artifacts | $(ls "$GITHUB_WORKSPACE/artifacts" 2>/dev/null | tr '\n' ' ') |"
             echo
-            echo "Kernel only - no boot.img is packed. Rollback needs your ROM's stock \`boot.img\`. Read \`docs/FLASH.md\` (Hinglish) first."
+            echo "Kernel only - no boot.img is packed. Rollback needs your ROM's stock \`boot.img\`. Read \`docs/FLASH.md\` first."
           } >>"$GITHUB_STEP_SUMMARY"
 
       - name: Upload artifacts
