@@ -126,7 +126,7 @@ raha to flash abort hoga — tab **2C** (ready-made `boot.img`, fastboot se) use
 ### Recovery se flash ke baad check
 
 ```bash
-adb shell uname -r     # …-4k-golden dikhna chahiye
+adb shell uname -r     # …-4k-GoldenEra-v1 dikhna chahiye
 ```
 
 ## 2B. Optional: khud `boot.img` banana (advanced)
@@ -233,7 +233,7 @@ zaroorat nahi) — isliye stock boot.img ka hona hi sabse bada insurance hai.
 ```bash
 adb shell uname -r
 # 6.6.118-android15-8-g<sha>-ab...
-# ...-4k-golden par khatam hona chahiye (humara custom suffix)
+# ...-4k-GoldenEra-v1 par khatam hona chahiye (humara custom suffix)
 ```
 
 Root check:
