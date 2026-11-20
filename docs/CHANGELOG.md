@@ -1,6 +1,6 @@
 # Changelog — GoldenEra
 
-**GoldenEra v1 · 𝙴𝚟𝚘𝚛𝚎𝚣 • 6.6.118**
+**Golden Era PERF · 𝙴𝚟𝚘𝚛𝚎𝚣 • 6.6.118**
 Redmi Note 13 5G (**gold**) · Google GKI `android15-6.6-2026-01_r34` (`e56cf6b09cca`) · 4 KB pages
 
 Every build is a GitHub Actions run; nothing is built on a PC, and the `boot.img` you
@@ -11,11 +11,11 @@ flash is packed from your own stock image.
 ## Version
 
 - Kernel **6.6.118**, GKI `android15-6.6-2026-01_r34`, 4 KB pages, CFI_CLANG, LTO_NONE
-- `uname -r`: `6.6.118-android15-8-maybe-dirty-4k-GoldenEra-v1`
-- Release title: `GoldenEra v1 · 𝙴𝚟𝚘𝚛𝚎𝚣 • 6.6.118`
+- `uname -r`: `6.6.118-android15-8-maybe-dirty-4k-GoldenEra-PERF` (release string changed for this build; module matching is by CRC)
+- Release title: `Golden Era PERF · 𝙴𝚟𝚘𝚛𝚎𝚣 • 6.6.118`
 - ABI: **9444/9444** exported symbol CRCs identical to the stock build (GKI 15511674)
 - Vendor modules: untouched stock MTK/Xiaomi prebuilts
-- Flavors in the release: `none` (vanilla), `bakasu`, `sukisu`, `kernelsu` (+SUSFS)
+- Root: **BakaSU `v4.2.0-rc3` builtin** (`CONFIG_KSU=y`), one kernel, no flavors
 
 ---
 
@@ -35,8 +35,8 @@ flash is packed from your own stock image.
 - `CONFIG_DEFAULT_TCP_CONG` `cubic` → `bbr` (+ `DEFAULT_BBR=y`)
 - `CONFIG_MODULE_SIG_PROTECT` `y` → off (so Google-signed `system_dlkm` modules load)
 - `CONFIG_THERMAL_WRITABLE_TRIPS` `y` → off (DO-NOT-INCLUDE contract)
-- `CONFIG_LOCALVERSION` `-4k` → `-4k-GoldenEra-v1` (identity only; CRCs present, release
-  string is not compared)
+- `CONFIG_LOCALVERSION` `-4k` → `-4k-GoldenEra-PERF` (identity only; with CRCs present
+  the loader compares vermagic flags, not the release string)
 - `CONFIG_UCLAMP_BUCKETS_COUNT` stays **20** — it was 5 in r14 and that bootlooped
 - Config delta against stock: 12 stock-only lines, 44 ours-only, out of ~7.7k
 
@@ -52,8 +52,7 @@ flash is packed from your own stock image.
 - Extras: exFAT, NTFS3, tmpfs xattr, gamepad HID (Xbox / PS / Switch), pstore + ramoops
 - Root (KernelSU flavor): **KernelSU `64833c00` + SUSFS `f98f0822`** — sus_mount,
   sus_kstat, sus_path, sus_map, spoof_uname, open_redirect, hide_symbols
-- Root (forks): **SukiSU-Ultra `v3.0.0`**, **BakaSU `v4.2.0-rc3`** — builtin, tracepoint
-  hook, no kernel source patches
+- Root: **BakaSU `v4.2.0-rc3`** — builtin, tracepoint hook, no kernel source patches
 - Runtime helper `gold-profiles.sh`: `gaming` / `sustained` / `balanced` /
   `charge-limit 80` / `restore`
 
@@ -116,10 +115,12 @@ flash is packed from your own stock image.
 
 ## Release policy
 
-- One release, `gold-latest`, always the newest content; older `gold-r*` are deleted
-- Every flavor lives inside it: `boot-<flavor>.img`, `Image-...-<flavor>`,
-  `AnyKernel3-...-<flavor>.zip`, `SHA256SUMS-<flavor>.txt`
+- One release, always the newest content; older `gold-*` releases are deleted
+- It holds one kernel (`Golden Era PERF`, BakaSU builtin): `boot.img`, `Image-...`,
+  `Image-...gz`, `AnyKernel3-...zip`, `SHA256SUMS.txt`, `NOTES.txt`, plus
+  `gold-profiles.sh` and `perf-check.sh`
 - The body is regenerated from the attached files, so it lists what is really there
+- Artifacts stay labelled **not boot-tested** until a device run is recorded
 
 ## Credits
 
@@ -129,7 +130,7 @@ flash is packed from your own stock image.
 
 ## Naming
 
-- Title / NOTES / docs: `GoldenEra v1 · 𝙴𝚟𝚘𝚛𝚎𝚣 • 6.6.118`
-- `uname -r`: `6.6.118-android15-8-maybe-dirty-4k-GoldenEra-v1`
+- Title / NOTES / docs: `Golden Era PERF · 𝙴𝚟𝚘𝚛𝚎𝚣 • 6.6.118`
+- `uname -r`: `6.6.118-android15-8-maybe-dirty-4k-GoldenEra-PERF`
 - `uname -r` cannot hold a space or `·` — it is a filesystem token
   (`/lib/modules/<release>`) and part of the module vermagic; `A-Za-z0-9 . - _` only

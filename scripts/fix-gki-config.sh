@@ -18,7 +18,7 @@ set -euo pipefail
 KROOT="${1:?usage: fix-gki-config.sh <repo-root-containing-common/>}"
 KDIR="$KROOT/common"
 DEFCONFIG="$KDIR/arch/arm64/configs/gki_defconfig"
-LOCALVERSION_EXTRA="${LOCALVERSION_EXTRA:--GoldenEra-v1}"
+LOCALVERSION_EXTRA="${LOCALVERSION_EXTRA:--GoldenEra-PERF}"
 CRC_STUB="${CRC_STUB:-false}"
 
 [ -f "$DEFCONFIG" ] || { echo "::error::missing $DEFCONFIG"; exit 1; }
@@ -96,7 +96,7 @@ for f in "$KDIR/android/abi_gki_protected_exports_aarch64" \
 done
 
 # 6. Kernel name, so a flashed build is identifiable:
-#    ...-ab<build>-4k  ->  ...-ab<build>-4k-GoldenEra-v1
+#    ...-ab<build>-4k  ->  ...-ab<build>-4k-GoldenEra-PERF
 #    (no spaces: the release string is a filesystem token - it names
 #    /lib/modules/<release> and is part of module vermagic)
 #    Only the *first* token of vermagic is the release string, and it is skipped

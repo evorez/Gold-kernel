@@ -12,7 +12,7 @@ name: Build GOLD custom kernel (android15-6.6, 4 KB, root + tweaks)
 #     cpusets, PSI, memcg, zram compression algos, MGLRU, ext4/F2FS/EROFS + inline
 #     crypto, mq-deadline, pstore/ramoops, WireGuard, exFAT, NTFS3, gamepad HID,
 #     BBR+fq default) - all built in, no module to push
-#   * kernel name suffixed "...-4k-GoldenEra-v1" so a flashed build is identifiable
+#   * kernel name suffixed "...-4k-GoldenEra-PERF" so a flashed build is identifiable
 #   * project name: GoldenEra (author 𝙴𝚟𝚘𝚛𝚎𝚣) - appears in the release title,
 #     the zip/boot.img names and NOTES.txt
 #   * deliverables are the kernel itself: Image, Image.gz, AnyKernel3 zip
@@ -30,14 +30,14 @@ on:
   workflow_dispatch:
     inputs:
       root_flavor:
-        description: "Root solution (kernelsu = the only one with in-tree SUSFS)"
+        description: "Root solution. Golden Era PERF ships ONE kernel: BakaSU builtin (CONFIG_KSU=y). Other values remain in scripts/apply-root.sh for bisection only."
         type: choice
-        options: [kernelsu, ksu-next, sukisu, bakasu, none]
-        default: kernelsu
+        options: [bakasu]
+        default: bakasu
       use_susfs:
-        description: "SUSFS root hiding (needs kernelsu; ignored when root_flavor=none)"
+        description: "SUSFS root hiding. Only KernelSU has verified in-tree SUSFS; BakaSU+SUSFS is redirected off (not a performance feature)"
         type: boolean
-        default: true
+        default: false
       tweaks:
         description: "Feature set from configs/gold-features.config (schedutil/EAS/uclamp, PSI, zram algos, FS, pstore, extras)"
         type: boolean
@@ -51,9 +51,9 @@ on:
         type: boolean
         default: false
       release_tag:
-        description: "Release to publish into. One stable tag holds every flavor side by side (boot-<flavor>.img, Image-<flavor>, zip-<flavor>); the newest gold-r* releases are pruned automatically"
+        description: "Release to publish into. One stable tag holds exactly the newest kernel; older gold-* releases are pruned automatically"
         type: string
-        default: "gold-latest"
+        default: "gold-perf"
       ksu_ref:
         description: "Root repo ref/commit (empty = pinned known-good pair: KSU 64833c00)"
         type: string
@@ -356,7 +356,9 @@ jobs:
         uses: actions/upload-artifact@v7
         with:
           name: GoldenEra-${{ inputs.root_flavor }}-susfs${{ inputs.use_susfs }}-${{ github.run_number }}
-          path: artifacts/
+          path: |
+            artifacts/
+            /tmp/bazel.log
           retention-days: 14
           if-no-files-found: error
 
@@ -370,7 +372,7 @@ jobs:
           TAG="${TAG:-gold-latest}"
           FLAVOR="${EFFECTIVE_ROOT_FLAVOR:-none}"
           VARIANTS="root=${FLAVOR},susfs=${EFFECTIVE_USE_SUSFS:-false},tweaks=${TWEAKS:-false}"
-          TITLE="GoldenEra v1 · 𝙴𝚟𝚘𝚛𝚎𝚣 • 6.6.118"
+          TITLE="Golden Era PERF · 𝙴𝚟𝚘𝚛𝚎𝚣 • 6.6.118"
 
           # One release holds every flavor side by side, so the file name has to say
           # which kernel it is: boot.img -> boot-<flavor>.img, Image-... -> Image-...-<flavor>.
@@ -400,14 +402,19 @@ jobs:
               --notes "Build in progress (${FLAVOR})." \
               || gh release view "$TAG" --repo "$GITHUB_REPOSITORY" >/dev/null
           fi
+          # One kernel per release: drop whatever the previous build left behind, so
+          # the release never mixes a new boot.img with an older Image.
+          for a in $(gh release view "$TAG" --repo "$GITHUB_REPOSITORY" --json assets --jq '.assets[].name'); do
+            gh release delete-asset "$TAG" "$a" --repo "$GITHUB_REPOSITORY" -y >/dev/null 2>&1 || true
+          done
           gh release upload "$TAG" "$stage"/* --repo "$GITHUB_REPOSITORY" --clobber
 
           # Regenerate the body from what is actually attached, so the release lists
           # every flavor currently inside it (this build is the one that just landed).
           {
-            echo "**GoldenEra v1** for the Redmi Note 13 5G (gold) - by 𝙴𝚟𝚘𝚛𝚎𝚣."
+            echo "**Golden Era PERF** for the Redmi Note 13 5G (gold) - by 𝙴𝚟𝚘𝚛𝚎𝚣."
             echo
-            echo "Built from \`${EXPECTED_FULL_SHA}\` (\`${COMMON_TAG}\`, kernel ${EXPECTED_VERSION}, 4 KB pages, \`-4k-GoldenEra-v1\`)."
+            echo "Built from \`${EXPECTED_FULL_SHA}\` (\`${COMMON_TAG}\`, kernel ${EXPECTED_VERSION}, 4 KB pages, \`-4k-GoldenEra-PERF\`)."
             echo
             # plain list, no tables
             gh release view "$TAG" --repo "$GITHUB_REPOSITORY" --json assets --jq '.assets[].name' \
@@ -437,7 +444,7 @@ jobs:
           for old in $(gh release list --repo "$GITHUB_REPOSITORY" --limit 100 --json tagName --jq '.[].tagName'); do
             [ "$old" = "$TAG" ] && continue
             case "$old" in
-              gold-r*)
+              gold-*)
                 echo "removing superseded release $old"
                 gh release delete "$old" --repo "$GITHUB_REPOSITORY" --cleanup-tag -y || true
                 ;;
