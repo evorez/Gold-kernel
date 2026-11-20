@@ -2,6 +2,8 @@
 # Integrate a root solution (+ optional SUSFS root hiding) into the GKI tree.
 #
 #   ROOT_FLAVOR=kernelsu  KernelSU (tiann) + SUSFS - the pair SUSFS is written for
+#   ROOT_FLAVOR=bakasu    BakaSU (KernelSU-based fork), pinned to a tag; same
+#                         symlink wiring, same caveat about in-tree SUSFS
 #   ROOT_FLAVOR=sukisu    SukiSU-Ultra, pinned to a tag. In-tree SUSFS is NOT wired
 #                         for it yet: SukiSU carries its own supercall dispatch that
 #                         expects headers from susfs4ksu's SukiSU patch set, so
@@ -85,7 +87,7 @@ if [ "$ROOT_FLAVOR" = "ksu-next" ] && [ "$USE_SUSFS" = "true" ]; then
     ROOT_FLAVOR=kernelsu
 fi
 
-if [ "$ROOT_FLAVOR" = "sukisu" ] && [ "$USE_SUSFS" = "true" ]; then
+if { [ "$ROOT_FLAVOR" = "sukisu" ] || [ "$ROOT_FLAVOR" = "bakasu" ]; } && [ "$USE_SUSFS" = "true" ]; then
     echo "::warning::SukiSU-Ultra + in-tree SUSFS is not verified yet (its dispatch needs"
     echo "::warning::susfs4ksu's SukiSU patch set, which we do not apply). For a hidden"
     echo "::warning::root use root_flavor=kernelsu + SUSFS; this build continues with sukisu,"
@@ -104,6 +106,11 @@ case "$ROOT_FLAVOR" in
     KSU_URL="https://github.com/KernelSU-Next/KernelSU-Next"
     KSU_REF="${KSU_REF:-v3.4.2}"
     KSU_DIR="$KROOT/KernelSU-Next"
+    ;;
+  bakasu)
+    KSU_URL="https://github.com/Baka-SU/BakaSU"
+    KSU_REF="${KSU_REF:-v4.2.0-rc3}"
+    KSU_DIR="$KROOT/BakaSU"
     ;;
   sukisu)
     # Upstream's own kernel/setup.sh clones from a private mirror (git.zako.shirkneko.top);
@@ -139,6 +146,7 @@ case "$ROOT_FLAVOR" in
     kernelsu) ksu_link="../../KernelSU/kernel" ;;
     ksu-next) ksu_link="../../KernelSU-Next/kernel" ;;
     sukisu)   ksu_link="../../SukiSU/kernel" ;;
+    bakasu)   ksu_link="../../BakaSU/kernel" ;;
 esac
 ln -sfn "$ksu_link" "$KDIR/drivers/kernelsu"
 grep -q 'kernelsu' "$KDIR/drivers/Makefile" \
