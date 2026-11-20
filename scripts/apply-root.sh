@@ -139,6 +139,43 @@ KSU_SHA="$(git -C "$KSU_DIR" rev-parse --short HEAD)"
 echo "    $ROOT_FLAVOR @ $KSU_SHA"
 [ -d "$KSU_DIR/kernel" ] || { echo "::error::$KSU_DIR/kernel missing - unexpected layout"; exit 1; }
 
+# BakaSU's Kbuild derives its version code from git *inside the build*:
+#   KSU_LOCAL_VERSION := $(shell cd $(KSU_SRC); $(GIT_BIN) rev-list --count HEAD)
+#   KSU_VERSION       := $(shell expr 30000 + $(KSU_LOCAL_VERSION) + 700)
+# and refuses to build at all when it cannot see a .git next to kernel/:
+#   $(error You should use <repo> as a git submodule instead of copying code directly)
+# Kleaf runs the compile in a sandbox, so both of those are fragile. Upstream's own
+# hint for Bazel users is to point KSU_SRC at the absolute path, which is what we do
+# here; the fallback keeps KSU_VERSION numeric even if git is unreachable, because an
+# empty version code is a compile error deep inside the driver and impossible to read
+# from the annotations.
+if [ "$ROOT_FLAVOR" = "bakasu" ]; then
+    python3 - "$KSU_DIR/kernel/Kbuild" "$KSU_DIR/kernel" <<'BK'
+import re, sys
+path, src = sys.argv[1], sys.argv[2]
+text = open(path, encoding="utf-8").read()
+before = text
+text = re.sub(r"^KSU_SRC := .*$", "KSU_SRC := " + src, text, count=1, flags=re.M)
+text = re.sub(r"^LOCAL_GIT_EXISTS := .*$", "LOCAL_GIT_EXISTS := 1", text, count=1, flags=re.M)
+text = text.replace(
+    "KSU_LOCAL_VERSION := $(shell cd $(KSU_SRC); $(GIT_BIN) rev-list --count HEAD)",
+    "KSU_LOCAL_VERSION := $(shell cd $(KSU_SRC) 2>/dev/null && $(GIT_BIN) rev-list --count HEAD 2>/dev/null || echo 12345)",
+    1)
+text = text.replace(
+    "KSU_VERSION := $(shell expr 30000 + $(KSU_LOCAL_VERSION) + 700)",
+    "KSU_VERSION := $(shell expr 30000 + $(KSU_LOCAL_VERSION) + 700 2>/dev/null || echo 42445)",
+    1)
+text = text.replace(
+    "$(shell cd $(KSU_SRC); [ -f ../.git/shallow ] && $(GIT_BIN) fetch --unshallow)",
+    "$(info -- no network in the sandbox: skipping fetch --unshallow)",
+    1)
+if text == before:
+    sys.exit("::error::BakaSU Kbuild did not look as expected - refusing to build blind")
+open(path, "w", encoding="utf-8").write(text)
+print("    BakaSU Kbuild: absolute KSU_SRC, version-code fallback, no in-build git fetch")
+BK
+fi
+
 # Wire the driver into the kernel the way upstream's setup.sh does. The link is
 # relative to common/drivers, so "../.." is the workspace root: an absolute link
 # would point outside the Bazel workspace and Kleaf would not follow it.
