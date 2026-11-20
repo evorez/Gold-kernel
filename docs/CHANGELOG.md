@@ -94,7 +94,9 @@ lines, 44 ours-only** out of 7.7k.
 | r28 | — | SukiSU-Ultra `v3.0.0` flavor (artifact only) | build ran |
 | r29 | — | `uname -r` → `-4k-GoldenEra-v1`, final naming | build ✅ 9444/9444 |
 | r30 | — | SukiSU retry | ❌ policy gate aborted (empty patch manifest + `pipefail`) — fixed |
-| r31+ | — | **BakaSU** flavor, vanilla build, and releases that keep only the newest | in progress |
+| r31 | — | **vanilla** (no root, tweaks on) | build ✅ |
+| r32 | — | **BakaSU** `v4.2.0-rc3` + tweaks, publishing | build ran |
+| r33 | — | SukiSU retry | ❌ KMI gate: fork-added KMI entries counted as missing — fixed |
 
 ---
 
