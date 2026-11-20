@@ -32,7 +32,7 @@ on:
       root_flavor:
         description: "Root solution (kernelsu = the only one with in-tree SUSFS)"
         type: choice
-        options: [kernelsu, ksu-next, sukisu, none]
+        options: [kernelsu, ksu-next, sukisu, bakasu, none]
         default: kernelsu
       use_susfs:
         description: "SUSFS root hiding (needs kernelsu; ignored when root_flavor=none)"
@@ -264,7 +264,7 @@ jobs:
           # check, only for that flavor.
           BAZEL_OPTS=""
           case "${EFFECTIVE_ROOT_FLAVOR:-none}" in
-            sukisu) BAZEL_OPTS="--nokmi_symbol_list_strict_mode" ;;
+            sukisu|bakasu) BAZEL_OPTS="--nokmi_symbol_list_strict_mode" ;;
           esac
           tools/bazel run $BAZEL_OPTS //common:kernel_aarch64_dist -- --destdir="$GITHUB_WORKSPACE/dist" 2>&1 | tee /tmp/bazel.log
           rc=${PIPESTATUS[0]}
@@ -375,6 +375,17 @@ jobs:
             gh release create "$TAG" --repo "$GITHUB_REPOSITORY" --title "$TITLE" --notes "$NOTES"
           fi
           gh release upload "$TAG" "$GITHUB_WORKSPACE"/artifacts/* --repo "$GITHUB_REPOSITORY" --clobber
+          # "latest = final": exactly one release should exist at any time, and it
+          # is always the newest build. Drop older gold-r* releases (and their tags).
+          for old in $(gh release list --repo "$GITHUB_REPOSITORY" --limit 100 --json tagName --jq '.[].tagName'); do
+            [ "$old" = "$TAG" ] && continue
+            case "$old" in
+              gold-r*)
+                echo "removing superseded release $old"
+                gh release delete "$old" --repo "$GITHUB_REPOSITORY" --cleanup-tag -y || true
+                ;;
+            esac
+          done
           echo "release URL: https://github.com/$GITHUB_REPOSITORY/releases/tag/$TAG" >>"$GITHUB_STEP_SUMMARY"
           echo "release: https://github.com/$GITHUB_REPOSITORY/releases/tag/$TAG"
 

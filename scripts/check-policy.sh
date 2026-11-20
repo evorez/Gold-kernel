@@ -45,7 +45,9 @@ if [ -d "$KDIR/.git" ]; then
     changed="$(git -C "$KDIR" status --porcelain --untracked-files=no | awk '{print $NF}')"
     upstream=""
     if [ -f "$MANIFEST" ]; then
-        upstream="$(sed -e 's/[[:space:]]*$//' "$MANIFEST" | grep -v '^$' | sort -u)"
+        # an empty manifest (a flavor wired by symlink, not by patch) makes the
+        # middle grep exit 1, and with pipefail that killed the whole gate
+        upstream="$(sed -e 's/[[:space:]]*$//' "$MANIFEST" | grep -v '^$' | sort -u || true)"
         echo "    $MANIFEST: $(printf '%s\n' "$upstream" | grep -c . || true) path(s) touched by the vendored patches"
     else
         echo "::warning::no $MANIFEST - treating every changed file as ours (stricter)"

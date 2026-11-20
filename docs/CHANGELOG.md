@@ -92,7 +92,9 @@ lines, 44 ours-only** out of 7.7k.
 | r26 | `gold-r26` | **KMI CRC gate on** (stock symvers 15511674) | build ✅ 9444/9444 |
 | r27 | `gold-r27` | + CAKE / CIFS / IP_SET (v1.1) | **booted** ✅ |
 | r28 | — | SukiSU-Ultra `v3.0.0` flavor (artifact only) | build ran |
-| r29 | — | `uname -r` → `-4k-GoldenEra-v1`, final naming | build ran |
+| r29 | — | `uname -r` → `-4k-GoldenEra-v1`, final naming | build ✅ 9444/9444 |
+| r30 | — | SukiSU retry | ❌ policy gate aborted (empty patch manifest + `pipefail`) — fixed |
+| r31+ | — | **BakaSU** flavor, vanilla build, and releases that keep only the newest | in progress |
 
 ---
 
@@ -109,6 +111,12 @@ lines, 44 ours-only** out of 7.7k.
    (r22 → r27) **booted** as well.
 7. Since then the CRC gate is permanent: every build compares 9444 symbol CRCs against
    stock, which is exactly what was missing when r14 was built.
+
+## Release policy: latest = final
+
+Exactly **one** release exists at any moment and it is always the newest build: the
+publish step creates the new release, uploads the assets, and deletes every older
+`gold-r*` release (with its tag). Older builds stay reachable as Actions artifacts.
 
 ## Gates every build passes
 
