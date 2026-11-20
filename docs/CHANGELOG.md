@@ -114,11 +114,22 @@ lines, 44 ours-only** out of 7.7k.
 7. Since then the CRC gate is permanent: every build compares 9444 symbol CRCs against
    stock, which is exactly what was missing when r14 was built.
 
-## Release policy: latest = final
+## Release policy: one release, every flavor inside it
 
-Exactly **one** release exists at any moment and it is always the newest build: the
-publish step creates the new release, uploads the assets, and deletes every older
-`gold-r*` release (with its tag). Older builds stay reachable as Actions artifacts.
+There is exactly **one** release (`gold-latest`) and it is always the newest content.
+A build publishes into it and the file name says which kernel it is:
+
+| File | Kernel |
+|---|---|
+| `boot-rest.img` / `boot-kernelsu.img` / `boot-bakasu.img` / `boot-sukisu.img` / `boot-none.img` | patched boot.img (your stock header/ramdisk, only the kernel payload swapped) |
+| `AnyKernel3-...-<flavor>.zip` | recovery-flashable zip |
+| `Image-...-<flavor>` / `.gz` | raw kernel |
+| `SHA256SUMS-<flavor>.txt`, `NOTES-<flavor>.txt` | checksums / notes for that flavor |
+
+`none` = **vanilla** (no root), `bakasu` = BakaSU, `sukisu` = SukiSU-Ultra,
+`kernelsu` = KernelSU + SUSFS. The body is regenerated from the attached files, so it
+always lists what is really in the release, and every older `gold-r*` release is
+deleted on publish.
 
 ## Gates every build passes
 
