@@ -70,7 +70,7 @@ echo "    4K pages, LTO_NONE, CFI_CLANG, MODVERSIONS, MODULE_SIG_PROTECT=off: OK
 
 # Root flavour consistency.
 case "${EFFECTIVE_ROOT_FLAVOR:-none}" in
-    kernelsu|ksu-next)
+    kernelsu|ksu-next|sukisu)
         need_y KSU; echo "    CONFIG_KSU=y"
         if [ "${EFFECTIVE_USE_SUSFS:-false}" = "true" ]; then
             need_y KSU_SUSFS; echo "    CONFIG_KSU_SUSFS=y"
