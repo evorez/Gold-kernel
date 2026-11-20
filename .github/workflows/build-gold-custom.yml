@@ -409,20 +409,19 @@ jobs:
             echo
             echo "Built from \`${EXPECTED_FULL_SHA}\` (\`${COMMON_TAG}\`, kernel ${EXPECTED_VERSION}, 4 KB pages, \`-4k-GoldenEra-v1\`)."
             echo
-            echo "| file | what it is |"
-            echo "|---|---|"
+            # plain list, no tables
             gh release view "$TAG" --repo "$GITHUB_REPOSITORY" --json assets --jq '.assets[].name' \
               | sort | while IFS= read -r a; do
                   case "$a" in
-                    boot-*.img)   echo "| \`$a\` | **patched boot.img** - your stock boot image with only the kernel payload swapped |" ;;
-                    *.zip)        echo "| \`$a\` | flashable AnyKernel3 zip (recovery) |" ;;
-                    Image*.gz)    echo "| \`$a\` | kernel, gzip |" ;;
-                    Image-*)      echo "| \`$a\` | raw kernel |" ;;
-                    SHA256SUMS*)  echo "| \`$a\` | checksums for that flavor |" ;;
-                    NOTES*)       echo "| \`$a\` | release notes / install pointer |" ;;
-                    FEATURES*)    echo "| \`$a\` | feature list (stock vs GoldenEra) |" ;;
-                    gold-profiles*) echo "| \`$a\` | runtime profile helper |" ;;
-                    *)            echo "| \`$a\` | - |" ;;
+                    boot-*.img)   echo "- \`$a\` - **patched boot.img**: your stock boot image with only the kernel payload swapped" ;;
+                    *.zip)        echo "- \`$a\` - flashable AnyKernel3 zip (recovery)" ;;
+                    Image*.gz)    echo "- \`$a\` - kernel, gzip" ;;
+                    Image-*)      echo "- \`$a\` - raw kernel" ;;
+                    SHA256SUMS*)  echo "- \`$a\` - checksums for that flavor" ;;
+                    NOTES*)       echo "- \`$a\` - release notes / install pointer" ;;
+                    FEATURES*)    echo "- \`$a\` - feature list (stock vs GoldenEra)" ;;
+                    gold-profiles*) echo "- \`$a\` - runtime profile helper" ;;
+                    *)            echo "- \`$a\`" ;;
                   esac
                 done
             echo
