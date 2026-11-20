@@ -52,14 +52,38 @@ def is_meta(line):
 
 kmilist = [l.strip() for l in open(kmi_list, encoding="utf-8", errors="replace")
            if l.strip() and not is_meta(l.strip())]
-missing = [s for s in kmilist if s not in ours]
+
+# Root forks (KernelSU / SukiSU / BakaSU) append their own symbols to
+# android/abi_gki_aarch64 so that Kleaf's trim keeps them. Those entries are not
+# part of Google's KMI contract: no prebuilt vendor module asks for them. If a
+# reference symvers is available it is the authority - a symbol the frontend list
+# adds but the stock build does not export is fork-private, so its absence here
+# can never break a vendor module.
+theirs_early = set()
+if ref:
+    try:
+        theirs_early = set(load(ref))
+    except OSError:
+        theirs_early = set()
+
+missing, fork_private = [], []
+for sym in kmilist:
+    if sym in ours:
+        continue
+    (fork_private if theirs_early and sym not in theirs_early else missing).append(sym)
+
+if fork_private:
+    print(f"::notice::{len(fork_private)} symbol(s) added to the KMI list by the root fork "
+          f"are not exported (fork-private, not required by vendor modules):")
+    for s in fork_private[:10]:
+        print(f"::notice::  {s}")
 if missing:
     print(f"::error::{len(missing)} KMI symbol(s) are missing from the built kernel:")
     for s in missing[:25]:
         print(f"::error::  {s}")
     print("::error::A missing KMI symbol means prebuilt vendor modules cannot load (black screen).")
     sys.exit(1)
-print(f"::notice::KMI list: all {len(kmilist)} symbols still exported")
+print(f"::notice::KMI list: all {len(kmilist) - len(fork_private)} stock symbols still exported")
 
 # --- 2. CRC parity against a reference build -------------------------------
 if ref:
