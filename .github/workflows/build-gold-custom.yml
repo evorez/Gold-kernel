@@ -255,7 +255,18 @@ jobs:
             echo "::error::tools/bazel not found after repo sync."
             exit 1
           fi
-          tools/bazel run //common:kernel_aarch64_dist -- --destdir="$GITHUB_WORKSPACE/dist" 2>&1 | tee /tmp/bazel.log
+          # SukiSU exports symbols that are not in GKI's KMI list, so Kleaf's
+          # strict-mode check (no additions, no removals) rejects the build:
+          #   Checking for kmi_symbol_list_strict_mode ... failed
+          # Additions cannot break a prebuilt module (it needs the symbols it was
+          # linked against, which our own KMI gate still verifies by CRC and by
+          # "no symbol that stock exports may disappear"), so relax only Kleaf's
+          # check, only for that flavor.
+          BAZEL_OPTS=""
+          case "${EFFECTIVE_ROOT_FLAVOR:-none}" in
+            sukisu) BAZEL_OPTS="--nokmi_symbol_list_strict_mode" ;;
+          esac
+          tools/bazel run $BAZEL_OPTS //common:kernel_aarch64_dist -- --destdir="$GITHUB_WORKSPACE/dist" 2>&1 | tee /tmp/bazel.log
           rc=${PIPESTATUS[0]}
           if [ $rc -ne 0 ]; then
             echo "::error::Bazel build failed (exit $rc). Matching log lines:"
