@@ -2,6 +2,10 @@
 # Integrate a root solution (+ optional SUSFS root hiding) into the GKI tree.
 #
 #   ROOT_FLAVOR=kernelsu  KernelSU (tiann) + SUSFS - the pair SUSFS is written for
+#   ROOT_FLAVOR=sukisu    SukiSU-Ultra, pinned to a tag. In-tree SUSFS is NOT wired
+#                         for it yet: SukiSU carries its own supercall dispatch that
+#                         expects headers from susfs4ksu's SukiSU patch set, so
+#                         sukisu + susfs=true is redirected to kernelsu below
 #   ROOT_FLAVOR=ksu-next  KernelSU-Next v3.4.x, no in-tree SUSFS
 #   ROOT_FLAVOR=none      no root at all
 #
@@ -81,6 +85,14 @@ if [ "$ROOT_FLAVOR" = "ksu-next" ] && [ "$USE_SUSFS" = "true" ]; then
     ROOT_FLAVOR=kernelsu
 fi
 
+if [ "$ROOT_FLAVOR" = "sukisu" ] && [ "$USE_SUSFS" = "true" ]; then
+    echo "::warning::SukiSU-Ultra + in-tree SUSFS is not verified yet (its dispatch needs"
+    echo "::warning::susfs4ksu's SukiSU patch set, which we do not apply). For a hidden"
+    echo "::warning::root use root_flavor=kernelsu + SUSFS; this build continues with sukisu,"
+    echo "::warning::susfs=false."
+    USE_SUSFS=false
+fi
+
 # ------------------------------------------------------------- root tree
 case "$ROOT_FLAVOR" in
   kernelsu)
@@ -92,6 +104,14 @@ case "$ROOT_FLAVOR" in
     KSU_URL="https://github.com/KernelSU-Next/KernelSU-Next"
     KSU_REF="${KSU_REF:-v3.4.2}"
     KSU_DIR="$KROOT/KernelSU-Next"
+    ;;
+  sukisu)
+    # Upstream's own kernel/setup.sh clones from a private mirror (git.zako.shirkneko.top);
+    # we clone the public GitHub tree at a pinned tag instead, and wire it exactly the
+    # way that script does (symlink into drivers/kernelsu, Makefile + Kconfig entries).
+    KSU_URL="https://github.com/SukiSU-Ultra/SukiSU-Ultra"
+    KSU_REF="${KSU_REF:-v3.0.0}"
+    KSU_DIR="$KROOT/SukiSU"
     ;;
   *) echo "::error::unknown ROOT_FLAVOR: $ROOT_FLAVOR"; exit 1 ;;
 esac
@@ -118,6 +138,7 @@ echo "    $ROOT_FLAVOR @ $KSU_SHA"
 case "$ROOT_FLAVOR" in
     kernelsu) ksu_link="../../KernelSU/kernel" ;;
     ksu-next) ksu_link="../../KernelSU-Next/kernel" ;;
+    sukisu)   ksu_link="../../SukiSU/kernel" ;;
 esac
 ln -sfn "$ksu_link" "$KDIR/drivers/kernelsu"
 grep -q 'kernelsu' "$KDIR/drivers/Makefile" \

@@ -30,9 +30,9 @@ on:
   workflow_dispatch:
     inputs:
       root_flavor:
-        description: "Root solution (kernelsu = required for SUSFS)"
+        description: "Root solution (kernelsu = the only one with in-tree SUSFS)"
         type: choice
-        options: [kernelsu, ksu-next, none]
+        options: [kernelsu, ksu-next, sukisu, none]
         default: kernelsu
       use_susfs:
         description: "SUSFS root hiding (needs kernelsu; ignored when root_flavor=none)"
@@ -240,8 +240,16 @@ jobs:
         run: bash "$GITHUB_WORKSPACE/scripts/apply-root.sh" "$GITHUB_WORKSPACE/gki"
 
       - name: Build GKI kernel (aarch64, 4 KB pages)
+        env:
+          # Kleaf builds reproducibly, which pins the banner date to the epoch:
+          # "6.6.118-... #1 Thu Jan  1 00:00:00 UTC 1970". Hand it the real epoch;
+          # if the rules ignore it the banner stays as it was, nothing else changes.
+          GOLD_BUILD_DATE: ${{ github.run_started_at }}
         run: |
           set +e
+          SOURCE_DATE_EPOCH="$(date -u -d "$GOLD_BUILD_DATE" +%s 2>/dev/null || echo 0)"
+          export SOURCE_DATE_EPOCH
+          echo "build epoch: $SOURCE_DATE_EPOCH"
           cd "$GITHUB_WORKSPACE/gki"
           if [ ! -x tools/bazel ]; then
             echo "::error::tools/bazel not found after repo sync."
