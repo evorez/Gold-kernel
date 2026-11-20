@@ -1,6 +1,6 @@
 # Changelog — GoldenEra
 
-Redmi Note 13 5G (**gold**) · author **𝙴𝚟𝚘𝚛𝚎𝚣**
+Redmi Note 13 5G (**gold**) · **GoldenEra v1 · 𝙴𝚟𝚘𝚛𝚎𝚣 • 6.6.118**
 
 Har entry ek GitHub Actions run se bani release hai (`gold-r<N>`), teeno variants
 (`root`, `susfs`, `tweaks`) ke saath. Sab kuch aapki hi stock `boot.img` +
@@ -11,11 +11,11 @@ Har entry ek GitHub Actions run se bani release hai (`gold-r<N>`), teeno variant
 ## GoldenEra v1 — (agla build, taiyaari ho rahi hai)
 
 Pehli baar kernel ka naam + author: **GoldenEra v1 by 𝙴𝚟𝚘𝚛𝚎𝚣**.
-`uname -r` ab `…-4k-golden` par khatam hoga, release title/notes, zip/boot.img
+`uname -r` ab `…-4k-GoldenEra-v1` par khatam hoga, release title/notes, zip/boot.img
 ke naam aur `NOTES.txt` sab GoldenEra brand karte hain.
 
 - **Naam**: project = GoldenEra v1, artifact = `GoldenEra-<root>-susfs<..>-<run>`,
-  kernel suffix `-4k-golden`
+  kernel suffix `-4k-GoldenEra-v1`
 - **ABI fix (asli wajah bootloop ki)**: `CONFIG_UCLAMP_BUCKETS_COUNT` 5 → **20**
   (stock value; `struct rq` ka layout stock jaisa)
 - **Policy**: DO-NOT-INCLUDE options ab *hamesha* off (`fix-gki-config.sh`), sirf
