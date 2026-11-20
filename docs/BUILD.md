@@ -38,7 +38,7 @@ KMI + package <1 min). Budget up to 60 min if the runner is slow.
 2. **Stock parity** (`scripts/fix-gki-config.sh`) — `MODULE_SIG_PROTECT` off,
    LTO stays `NONE`, CFI stays on, `MODVERSIONS=y`, KPROBES/KALLSYMS on, protected
    export lists removed, `check_defconfig` gate disabled, kernel name suffixed
-   `-4k-GoldenEra-PERF`.
+   `-4k-HAVOC`.
 3. **Feature set** (`scripts/apply-tweaks.sh` + `configs/gold-features.config`,
    `configs/gold-devbuild.config` when `dev_build=true`) — a fragment of `REQ`/`OPT`
    lines is applied to `gki_defconfig`; built-in only, no `.ko` to push. Per-item

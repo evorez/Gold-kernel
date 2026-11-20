@@ -1,6 +1,6 @@
 # Root: BakaSU, builtin
 
-Golden Era PERF ships **one** root implementation: **BakaSU**, compiled into the kernel
+HAVOC ships **one** root implementation: **BakaSU**, compiled into the kernel
 (`CONFIG_KSU=y`), no root LKM, no second KernelSU fork.
 
 | Item | Value |

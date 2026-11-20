@@ -1,4 +1,4 @@
-# Benchmark procedure — Golden Era PERF
+# Benchmark procedure — HAVOC
 
 This is the only accepted way to claim a performance difference on this project.
 Nothing in the repo has been measured on the phone yet (see `docs/AUDIT.md`), so treat
