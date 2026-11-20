@@ -6,7 +6,7 @@ Custom-kernel workspace for the **Xiaomi Redmi Note 13 5G** (codename **gold**),
 
 - Release history / bisection ladder: [`docs/CHANGELOG.md`](docs/CHANGELOG.md)
 - Bootloop diagnosis: [`docs/BOOTLOOP.md`](docs/BOOTLOOP.md)
-- Flash guide (Hinglish): [`docs/FLASH.md`](docs/FLASH.md)
+- Flash guide: [`docs/FLASH.md`](docs/FLASH.md)
 
 Two workflows, in the order they should be used:
 
@@ -24,7 +24,7 @@ Two workflows, in the order they should be used:
 
 The old Xiaomi `gold-s-oss` source is Android 13 / kernel 5.10 — **not** compatible with this device as-is. Both workflows build Google's canonical `kernel/common` GKI source for the exact running build.
 
-## Custom kernel — kya milta hai
+## Custom kernel — what you get
 
 - **Root built into the kernel**: KernelSU (default, the fork SUSFS patches are maintained against) or KernelSU-Next — no Magisk-style patching needed.
 - **SUSFS** root hiding: the upstream pair (susfs4ksu + its `10_enable_susfs_for_ksu.patch`), both ends pinned to a coherent commit pair.
@@ -80,7 +80,7 @@ end, ~11 min of that is Bazel). Artifact: `GoldenEra-kernelsu-susfstrue-11`.
 
 ### Read before flashing
 
-- **[docs/FLASH.md](docs/FLASH.md)** — Hinglish step-by-step (backup, flash, rollback, dm-verity, troubleshooting). **Read this first.**
+- **[docs/FLASH.md](docs/FLASH.md)** — step-by-step (backup, flash, rollback, dm-verity, troubleshooting). **Read this first.**
 - **[docs/BUILD.md](docs/BUILD.md)** — every workflow input, what each step does, how to read failure annotations.
 - **[docs/FEATURES.md](docs/FEATURES.md)** — the feature map: what is in the Image, what is vendor-side, what is refused (and which gate enforces it).
 - **[docs/RESEARCH.md](docs/RESEARCH.md)** — the device facts and config rules behind the design.

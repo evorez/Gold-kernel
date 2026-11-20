@@ -231,7 +231,7 @@ chmod +x "$OUTDIR/gold-profiles.sh" 2>/dev/null || true
     echo "  gold-profiles.sh {status|balanced|gaming|sustained|charge-limit 80|restore}"
     echo
     echo "Feature map: FEATURES.md (what is in the Image, what is vendor-side, what is refused)."
-    echo "Read docs/FLASH.md (Hinglish) before the first flash."
+    echo "Read docs/FLASH.md before the first flash."
 } >"$OUTDIR/NOTES.txt"
 
 ( cd "$OUTDIR" && sha256sum boot.img AnyKernel3-*.zip Image-* 2>/dev/null >SHA256SUMS.txt || true )
