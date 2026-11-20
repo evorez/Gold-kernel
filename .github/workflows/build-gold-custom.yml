@@ -412,19 +412,22 @@ jobs:
             gh release view "$TAG" --repo "$GITHUB_REPOSITORY" --json assets --jq '.assets[].name' \
               | sort | while IFS= read -r a; do
                   case "$a" in
-                    boot-*.img)   echo "- \`$a\` - **patched boot.img**: your stock boot image with only the kernel payload swapped" ;;
+                    boot.img)     echo "- \`$a\` - **patched boot.img** for fastboot: your stock boot image with only the kernel payload swapped (header/cmdline/ramdisk/tail byte-identical)" ;;
                     *.zip)        echo "- \`$a\` - flashable AnyKernel3 zip (recovery)" ;;
                     Image*.gz)    echo "- \`$a\` - kernel, gzip" ;;
                     Image-*)      echo "- \`$a\` - raw kernel" ;;
                     SHA256SUMS*)  echo "- \`$a\` - checksums for that flavor" ;;
                     NOTES*)       echo "- \`$a\` - release notes / install pointer" ;;
                     FEATURES*)    echo "- \`$a\` - feature list (stock vs GoldenEra)" ;;
-                    gold-profiles*) echo "- \`$a\` - runtime profile helper" ;;
+                    gold-profiles*) echo "- \`$a\` - runtime profiles (balanced / gaming / sustained / charge-limit / restore)" ;;
+                    perf-check*)  echo "- \`$a\` - read-only state dump for stock-vs-custom comparison" ;;
                     *)            echo "- \`$a\`" ;;
                   esac
                 done
             echo
-            echo "Flavors: \`none\` = vanilla (no root), \`bakasu\` = BakaSU (newest), \`sukisu\` = SukiSU-Ultra, \`kernelsu\` = KernelSU + SUSFS (in-tree)."
+            echo "One kernel, one root: **BakaSU \`v4.2.0-rc3\` builtin** (\`CONFIG_KSU=y\`, tracepoint hook). Two delivery formats: the recovery-flashable AnyKernel3 zip and the patched boot.img for fastboot."
+            echo
+            echo "**Status: not boot-tested.** This flavor and the \`-HAVOC\` release string have not run on the phone yet."
             echo
             echo "Every build in here passed: pinned source, config read-back, policy gate, **9444/9444 KMI CRC parity** against the stock GKI build. Install: \`docs/FLASH.md\`. Keep your stock boot.img for rollback."
             echo
