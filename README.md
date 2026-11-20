@@ -1,9 +1,12 @@
-# GoldenEra — custom kernel for the Redmi Note 13 5G (gold)
+# Golden Era PERF — custom kernel for the Redmi Note 13 5G (gold)
 
-**GoldenEra v1 · 𝙴𝚟𝚘𝚛𝚎𝚣 • 6.6.118**
+**Golden Era PERF · 𝙴𝚟𝚘𝚛𝚎𝚣 • 6.6.118**
 
 Custom-kernel workspace for the **Xiaomi Redmi Note 13 5G** (codename **gold**), driven from GitHub Actions (no PC required — only a phone with a browser).
 
+- Audit, 101-item checklist: [`docs/AUDIT.md`](docs/AUDIT.md)
+- Benchmark procedure: [`docs/BENCH.md`](docs/BENCH.md)
+- Root (BakaSU builtin): [`docs/ROOT.md`](docs/ROOT.md)
 - Release history / bisection ladder: [`docs/CHANGELOG.md`](docs/CHANGELOG.md)
 - Bootloop diagnosis: [`docs/BOOTLOOP.md`](docs/BOOTLOOP.md)
 - Flash guide: [`docs/FLASH.md`](docs/FLASH.md)
@@ -39,7 +42,7 @@ The old Xiaomi `gold-s-oss` source is Android 13 / kernel 5.10 — **not** compa
 - **[docs/FEATURES.md](docs/FEATURES.md)**: every requested item → where it actually
   lives (Image config vs MediaTek vendor module vs runtime script) and how the
   "do not include" list is machine-checked.
-- Kernel name ends in `-4k-GoldenEra-v1`, so `uname -r` tells you a custom build is running.
+- Kernel name ends in `-4k-GoldenEra-PERF`, so `uname -r` tells you a custom build is running.
 - Guard rails: stock config parity, in-image config verification, and a **KMI gate** so the prebuilt MediaTek vendor modules still load.
 
 ### Run it

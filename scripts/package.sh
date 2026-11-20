@@ -183,17 +183,17 @@ if has image; then
 fi
 
 # ------------------------------------------------------- runtime tools + docs
-for f in "$SCRIPT_DIR/../tools/gold-profiles.sh" "$SCRIPT_DIR/../docs/FEATURES.md"; do
+for f in "$SCRIPT_DIR/../tools/gold-profiles.sh" "$SCRIPT_DIR/../tools/perf-check.sh" "$SCRIPT_DIR/../docs/FEATURES.md"; do
     [ -f "$f" ] && cp -f "$f" "$OUTDIR/" && echo "==> shipped $(basename "$f")"
 done
-chmod +x "$OUTDIR/gold-profiles.sh" 2>/dev/null || true
+chmod +x "$OUTDIR/gold-profiles.sh" "$OUTDIR/perf-check.sh" 2>/dev/null || true
 
 # the intermediate Image.gz is only a build aid; the artifact is Image-<base>.gz
 [ "$GEN_GZ" = 1 ] && rm -f "$OUTDIR/Image.gz"
 
 # ------------------------------------------------------------------- notes
 {
-    echo "GoldenEra v1 · 𝙴𝚟𝚘𝚛𝚎𝚣 • 6.6.118"
+    echo "Golden Era PERF · 𝙴𝚟𝚘𝚛𝚎𝚣 • 6.6.118"
     echo "custom kernel for the Redmi Note 13 5G (gold)"
     echo "kernel: $KVER"
     echo "built:  $(date -u +%Y-%m-%dT%H:%M:%SZ)"
@@ -229,6 +229,11 @@ chmod +x "$OUTDIR/gold-profiles.sh" 2>/dev/null || true
     echo "Runtime profiles (after root):"
     echo "  adb push gold-profiles.sh /data/local/tmp/ && adb shell su -c 'sh /data/local/tmp/gold-profiles.sh gaming'"
     echo "  gold-profiles.sh {status|balanced|gaming|sustained|charge-limit 80|restore}"
+    echo
+    echo "Measurement (no root needed for most of it):"
+    echo "  adb push perf-check.sh /data/local/tmp/ && adb shell sh /data/local/tmp/perf-check.sh"
+    echo "  perf-check.sh dumps governor/policy/uclamp/thermal/GPU/zram/IO state to a file"
+    echo "  you can diff between builds - docs/BENCH.md is the repeatable procedure."
     echo
     echo "Feature map: FEATURES.md (what is in the Image, what is vendor-side, what is refused)."
     echo "Read docs/FLASH.md before the first flash."
