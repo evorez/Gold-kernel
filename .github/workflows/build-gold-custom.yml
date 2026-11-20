@@ -270,14 +270,20 @@ jobs:
           rc=${PIPESTATUS[0]}
           if [ $rc -ne 0 ]; then
             echo "::error::Bazel build failed (exit $rc). Matching log lines:"
-            grep -iE 'error|FAILED|fatal|cannot|no such|denied|refused|timeout|undefined|not found' /tmp/bazel.log | tail -35 | while IFS= read -r line; do
+            # Run logs are not reachable from every environment, so the annotations
+            # are the only window into a failure. Emit both the error-looking lines
+            # and the context around the driver that failed, which is where a root
+            # fork's own build system usually complains.
+            {
+              grep -iE 'error|FAILED|fatal|cannot|no such|no rule|denied|refused|permission|timeout|undefined|not found|missing|submodule|not supported|unsupported' /tmp/bazel.log \
+                | grep -viE 'warning|Werror=|_ERROR_|-D[A-Z_]*ERROR' | tail -28
+              echo "--- context around drivers/kernelsu ---"
+              grep -n -B4 -A10 'drivers/kernelsu' /tmp/bazel.log | tail -22
+              echo "--- tail ---"
+              tail -18 /tmp/bazel.log
+            } | while IFS= read -r line; do
               esc=$(printf '%s' "$line" | sed -e 's/%/%25/g' -e 's/\r//g')
-              echo "::error::bazel: ${esc:0:250}"
-            done
-            echo "::error::bazel: tail:"
-            tail -15 /tmp/bazel.log | while IFS= read -r line; do
-              esc=$(printf '%s' "$line" | sed -e 's/%/%25/g' -e 's/\r//g')
-              echo "::error::tail: ${esc:0:250}"
+              echo "::error::bazel: ${esc:0:240}"
             done
             exit $rc
           fi
