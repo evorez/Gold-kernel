@@ -374,22 +374,14 @@ jobs:
           VARIANTS="root=${FLAVOR},susfs=${EFFECTIVE_USE_SUSFS:-false},tweaks=${TWEAKS:-false}"
           TITLE="Golden Era PERF · 𝙴𝚟𝚘𝚛𝚎𝚣 • 6.6.118"
 
-          # One release holds every flavor side by side, so the file name has to say
-          # which kernel it is: boot.img -> boot-<flavor>.img, Image-... -> Image-...-<flavor>.
+          # Golden Era PERF ships a single kernel, so the assets keep their plain names
+          # (boot.img, Image-..., AnyKernel3-...zip): there is nothing to disambiguate.
           stage=/tmp/release-stage
           rm -rf "$stage"; mkdir -p "$stage"
           for f in "$GITHUB_WORKSPACE"/artifacts/*; do
             base="$(basename "$f")"
-            case "$base" in
-              boot.img)          new="boot-${FLAVOR}.img" ;;
-              *.zip)             new="${base%.zip}-${FLAVOR}.zip" ;;
-              *.gz)              new="${base%.gz}-${FLAVOR}.gz" ;;
-              SHA256SUMS.txt)    new="SHA256SUMS-${FLAVOR}.txt" ;;
-              NOTES.txt)         new="NOTES-${FLAVOR}.txt" ;;
-              FEATURES.md)       new="FEATURES-${FLAVOR}.md" ;;
-              gold-profiles.sh)  new="gold-profiles-${FLAVOR}.sh" ;;
-              *)                 new="${base}-${FLAVOR}" ;;
-            esac
+            # one kernel per release: keep the plain names, no flavour suffix
+            new="$base"
             cp "$f" "$stage/$new"
           done
           ls -l "$stage"
