@@ -103,7 +103,17 @@ if has anykernel; then
         git -C "$AK3" fetch -q --depth=1 origin HEAD && git -C "$AK3" checkout -q FETCH_HEAD \
             || { echo "::error::AnyKernel3 clone failed"; exit 1; }
     fi
-    rm -rf "$AK3/.git" "$AK3/README.md"
+    # Trim the upstream tree to what a boot-only flash needs. The image payload is
+    # ~97% of the zip, so this is about a clean recovery package, not size:
+    #   .github / LICENSE / README   - repository metadata, nothing a recovery reads
+    #   patch/ ramdisk/ modules/     - empty placeholders for do.systemless/do.modules,
+    #                                  both of which are 0 in our anykernel.sh
+    #   tools/fec tools/magiskpolicy - not referenced by ak3-core.sh at all
+    # Everything else stays: busybox, magiskboot, httools/lptools/snapshotupdater are
+    # used by write_boot() and by flash_boot() (the no-ramdisk path we still allow).
+    rm -rf "$AK3/.git" "$AK3/.github" "$AK3/README.md" "$AK3/LICENSE" \
+           "$AK3/patch" "$AK3/ramdisk" "$AK3/modules"
+    rm -f  "$AK3/tools/fec" "$AK3/tools/magiskpolicy"
     cp -f "$IMAGE" "$AK3/Image"
     cat >"$AK3/anykernel.sh" <<AKSH
 ### AnyKernel3 Ramdisk Mod Script
@@ -170,6 +180,17 @@ AKSH
     printf '%s' "$ak_sh" | grep -q 'ak3-core.sh' || { echo "::error::anykernel.sh does not source ak3-core.sh"; exit 1; }
     printf '%s' "$ak_sh" | grep -qE 'flash_boot|write_boot' || { echo "::error::anykernel.sh has no install path"; exit 1; }
     echo "    recovery-flashable structure verified (update-binary 0755, ak3-core.sh, anykernel.sh, Image)"
+    # the trim must never remove a tool ak3-core.sh actually calls
+    missing_tool=""
+    for t in $(grep -oE '(magiskboot|magiskpolicy|busybox|httools_static|lptools_static|snapshotupdater_static|fec)' \
+                   "$AK3/tools/ak3-core.sh" | sort -u); do
+        [ -e "$AK3/tools/$t" ] || missing_tool="$missing_tool $t"
+    done
+    if [ -n "$missing_tool" ]; then
+        echo "::error::trimmed zip is missing tool(s):$missing_tool"
+        exit 1
+    fi
+    echo "    every tool ak3-core.sh calls is still inside the zip"
     hits="$(unzip -p "$AKZIP" Image | strings | grep -c "$KVER" || true)"
     [ "${hits:-0}" -gt 0 ] || { echo "::error::wrong Image packed into the zip"; exit 1; }
     ls -lh "$AKZIP" | sed 's/^/    /'
