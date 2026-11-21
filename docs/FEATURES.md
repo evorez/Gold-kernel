@@ -47,7 +47,7 @@ Legend
 
 | Item | Status | Detail |
 |---|---|---|
-| ZRAM with LZ4 / LZ4-RLE | ✅/🔧 | The zram **driver** stays Google's `zram.ko` (the ROM loads it; flipping it to `=y` would not change what runs). The compression backends it can use are in the Image: `CRYPTO_LZ4`, `CRYPTO_LZ4HC`, `CRYPTO_LZO` (lzo-rle), optional `ZSTD`. |
+| ZRAM with LZ4 / LZ4-RLE | ✅/🔧 | The zram **driver** stays Google's `zram.ko` (the ROM loads it; flipping it to `=y` would not change what runs). The compression backends it can use are in the Image: `CRYPTO_LZ4`, `CRYPTO_LZ4HC`, `CRYPTO_LZO` (lzo-rle), optional `842`/`ZSTD`. |
 | PSI | ✅ | `CONFIG_PSI=y`, `# CONFIG_PSI_DEFAULT_DISABLED` (asserted) |
 | Userspace LMKD compatibility | ✅ | LMKD needs PSI + memcg + oom handling in the kernel — all present; the kill policy stays userspace (stock) |
 | Memory cgroups | ✅ | `CONFIG_MEMCG=y` |
@@ -74,18 +74,22 @@ Legend
 | Wakelock and suspend statistics | ✅ | `CONFIG_PM_SLEEP_DEBUG` → `/sys/power/suspend_stats` (`gold-profiles.sh status` prints it). Android's wakelock accounting itself is userspace/HAL in 6.6. |
 | Charging overclock | ⛔ | **Not implemented.** It means writing MediaTek's charger driver (vendor module, not in this Image), where a wrong current/voltage setting is a hardware-safety issue, not a performance tweak. If you want faster charging, use the vendor's own fast-charge path. |
 
-## EXTRAS
+### BBR version
 
-Trimmed on purpose: a performance kernel does not carry filesystems and drivers that
-never touch frame time. Removed from the feature set: **WireGuard, exFAT, NTFS3,
-tmpfs xattr, USB gamepad HID (Xbox/PS/Switch), the 842 zram backend, CIFS and the
-ipset/xt_set firewall helpers.** Whatever the stock defconfig already enables stays
-enabled — we only stopped forcing it.
+- **BBRv1** (shipped): mainline since 4.9, `CONFIG_DEFAULT_BBR=y`, paired with `fq`.
+- **BBRv3** (not shipped): out-of-tree, Google's `google/bbr` `v3` branch, needs a manual
+  rebase onto 6.6 and touches exported TCP internals (CRC risk). No mobile perf evidence.
+
+## EXTRAS
 
 | Item | Status | Detail |
 |---|---|---|
-| pstore / ramoops | ✅ | `CONFIG_PSTORE`, `CONFIG_PSTORE_RAM`, `CONFIG_PSTORE_CONSOLE` — the last kernel log survives a reboot (kept for diagnostics) |
-| Root | 🔀 | `root_flavor`: `bakasu` (BakaSU builtin) or `none` (vanilla); `brand`: `HAVOC` or `GoldenEra-v1` |
+| WireGuard | ✅ | `CONFIG_WIREGUARD=y` (built in, no userspace module needed) |
+| exFAT | ✅ | `CONFIG_EXFAT_FS=y` |
+| NTFS3 | ✅ | `CONFIG_NTFS3_FS=y` |
+| USB gamepad / HID | ✅ | `CONFIG_HID_GENERIC`, `CONFIG_INPUT_JOYDEV` + optional `JOYSTICK_XPAD`, `HID_PLAYSTATION`, `HID_NINTENDO`, `HID_SONY`, `HID_MICROSOFT` |
+| Optional KernelSU | 🔀 | `root_flavor` input: `kernelsu` (default, KernelSU + SUSFS), `ksu-next` (KernelSU-Next, no in-tree SUSFS), `none` |
+| pstore / ramoops | ✅ | `CONFIG_PSTORE`, `CONFIG_PSTORE_RAM`, `CONFIG_PSTORE_CONSOLE` (+ optional `PSTORE_PMSG`) — last kernel log survives a reboot |
 | Ftrace / perf development build | 🔀 | `dev_build=true` applies `configs/gold-devbuild.config` (`FUNCTION_TRACER`, `DYNAMIC_FTRACE`, `FTRACE_SYSCALLS`, `KPROBE_EVENTS`, …). Off by default: debug infrastructure, extra exported symbols, bigger Image. |
 
 ---
