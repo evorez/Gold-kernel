@@ -113,10 +113,24 @@ flash is packed from your own stock image.
 - Policy gate: thermal / OPP / DVFS / governor / display / fsync / SELinux permissive
 - Packaging: boot.img header byte-identical, zip structure and permissions checked
 
-## Packaging: what is inside the zip
+## HAVOC defaults
 
-The recovery zip is the pinned AnyKernel3 tree plus our `Image`, trimmed to what a
-boot-only flash actually reads: `.github/`, `LICENSE`, `README.md`, the empty
+- CPU ceiling: 2000 MHz (6x A55 cluster), 2400 MHz (2x A76 cluster) — read from
+  `cpuinfo_max_freq` and clamped, never assumed
+- GPU ceiling: 1068 MHz via devfreq `max_freq` (unit detected by magnitude)
+- schedutil `up_rate_limit_us` 500 / `down` 20000, top-app `uclamp.min` 512,
+  background `uclamp.max` 512, I/O `mq-deadline`
+- Applied at boot by `/data/adb/service.d/99-havoc.sh` (installed by the zip) and
+  on demand by `gold-profiles.sh havoc`
+- **Minimum frequencies are not pinned.** A pinned min==max would defeat thermal
+  mitigation; the ceiling is all HAVOC sets, so sustained load still throttles safely
+
+## Packaging: two files per build, four in the release
+
+The release carries **only** `<brand> kernel <ver>.zip` and `<brand> Boot.img(A16)`.
+Inside the zip, the pinned AnyKernel3 tree is rebranded to **𝙴𝚟𝚘𝚛𝚎𝚣 ✩** (upstream
+author/XDA lines removed from what a recovery prints) and trimmed to what a boot-only
+flash actually reads: `.github/`, `LICENSE`, `README.md`, the empty
 `patch/`, `ramdisk/` and `modules/` placeholders (we run `do.systemless=0`,
 `do.modules=0`) and the two tools `ak3-core.sh` never calls (`fec`, `magiskpolicy`).
 `busybox`, `magiskboot`, `httools_static`, `lptools_static` and

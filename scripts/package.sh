@@ -1,13 +1,14 @@
 #!/usr/bin/env bash
 # Package the built kernel into everything needed to try it on gold.
 #
-# Outputs:
-#   Image-<name> / Image-<name>.gz  <- the raw kernel (the actual deliverable)
-#   boot.img                        <- only when STOCK_BOOT is given: the user's own
-#                                      boot image with nothing but the kernel swapped
-#   AnyKernel3-<name>-<ver>.zip     <- recovery-flashable zip (TWRP/SHRP/KernelFlasher)
-#   Image / Image.gz                <- raw kernel, for manual repacking
-#   NOTES.txt / SHA256SUMS.txt      <- what this is, how to flash, rollback
+# Outputs - exactly two files, nothing else:
+#   "<label> kernel <ver>.zip"   <- recovery-flashable (TWRP/SHRP/KernelFlasher),
+#                                   AnyKernel3 tree rebranded to 𝙴𝚟𝚘𝚛𝚎𝚣 ✩
+#   "<label> Boot.img(A16)"      <- only when STOCK_BOOT is given: the user's own boot
+#                                   image with nothing but the kernel payload swapped
+#
+# Labels (BRAND_LABEL / BOOT_LABEL) come from the workflow, so the same script produces
+# "Havoc-GoldenEra Perf kernel 6.6.118.zip" and "Golden Era V1 kernel 6.6.118.zip".
 #
 # gold's boot partition is header v4 with ramdisk_size = 0 (there is no init_boot
 # on this device; the ramdisk lives in vendor_boot), kernel = Image.gz, page size
@@ -25,6 +26,8 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 DIST="${DIST:-}"
 OUTDIR="${OUTDIR:-$PWD/artifacts}"
 KERNEL_NAME="${KERNEL_NAME:-GoldenEra}"
+BRAND_LABEL="${BRAND_LABEL:-$KERNEL_NAME}"     # "Havoc-GoldenEra Perf" / "Golden Era V1"
+BOOT_LABEL="${BOOT_LABEL:-$BRAND_LABEL}"       # "Havoc-GoldenEra"     / "Golden Era V1"
 FORMATS="${FORMATS:-anykernel,image}"
 STOCK_BOOT="${STOCK_BOOT:-}"
 VENDOR_BOOT="${VENDOR_BOOT:-}"
@@ -50,6 +53,8 @@ if [ -z "$IMAGE_GZ" ] && [ -n "$DIST" ]; then IMAGE_GZ="$DIST/Image.gz"; fi
 
 KVER="$(strings "$IMAGE" | grep -oE 'Linux version [0-9][^ ]*' | head -n1 | cut -d' ' -f3)"
 [ -n "$KVER" ] || { echo "::error::cannot read kernel version from $IMAGE"; exit 1; }
+KVER_SHORT="$(printf '%s' "$KVER" | grep -oE '^[0-9]+\.[0-9]+\.[0-9]+')"
+[ -n "$KVER_SHORT" ] || KVER_SHORT="$KVER"
 BASE="${KERNEL_NAME}-${KVER}"
 echo "==> kernel:  $KVER"
 echo "==> formats: $FORMATS"
@@ -74,11 +79,12 @@ if [ -n "$STOCK_BOOT" ] && [ -f "$STOCK_BOOT" ]; then
         echo "==> vendor_boot.img (reference only, never modified)"
         python3 "$SCRIPT_DIR/bootimg.py" vendor "$VENDOR_BOOT" | sed 's/^/      /'
     fi
-    python3 "$SCRIPT_DIR/bootimg.py" repack "$STOCK_BOOT" "$IMAGE_GZ" "$OUTDIR/boot.img" "$PART_SIZE" \
+    BOOT_OUT="$OUTDIR/${BOOT_LABEL} Boot.img(A16)"
+    python3 "$SCRIPT_DIR/bootimg.py" repack "$STOCK_BOOT" "$IMAGE_GZ" "$BOOT_OUT" "$PART_SIZE" \
         || { echo "::error::could not repack the stock boot image"; exit 1; }
-    python3 "$SCRIPT_DIR/bootimg.py" verify "$OUTDIR/boot.img" "$IMAGE_GZ" "$STOCK_BOOT" "$PART_SIZE" \
+    python3 "$SCRIPT_DIR/bootimg.py" verify "$BOOT_OUT" "$IMAGE_GZ" "$STOCK_BOOT" "$PART_SIZE" \
         || { echo "::error::repacked boot.img failed verification"; exit 1; }
-    ls -lh "$OUTDIR/boot.img" | sed 's/^/    /'
+    ls -lh "$BOOT_OUT" | sed 's/^/    /'
 else
     echo "==> boot.img: not built (no stock boot image provided)"
     echo "    this build ships the kernel only; see docs/FLASH.md"
@@ -114,6 +120,24 @@ if has anykernel; then
     rm -rf "$AK3/.git" "$AK3/.github" "$AK3/README.md" "$AK3/LICENSE" \
            "$AK3/patch" "$AK3/ramdisk" "$AK3/modules"
     rm -f  "$AK3/tools/fec" "$AK3/tools/magiskpolicy"
+
+    # Rebrand what the recovery actually prints. Everything the user sees while flashing
+    # comes from update-binary (the banner) and our anykernel.sh; upstream's author tags
+    # and XDA lines are removed rather than left in place.
+    UPD="$AK3/META-INF/com/google/android/update-binary"
+    sed -i -e 's/^# AnyKernel3 Backend (DO NOT CHANGE)$/# 𝙴𝚟𝚘𝚛𝚎𝚣 ✩ recovery backend (do not change)/' \
+           -e 's/anykernel3-/havoc-/g' "$UPD"
+    sed -i -e 's/^# osm0sis @ xda-developers$/# 𝙴𝚟𝚘𝚛𝚎𝚣 ✩/' \
+           -e 's/^author=.*/author=𝙴𝚟𝚘𝚛𝚎𝚣 ✩/' \
+           -e 's/AnyKernel3 by osm0sis @ xda-developers/𝙴𝚟𝚘𝚛𝚎𝚣 ✩/' \
+           -e '/xda-developers/d' \
+           -e '/osm0sis/d' "$UPD"
+    sed -i -e '/xda-developers/d' -e '/osm0sis/d' "$AK3/tools/ak3-core.sh"
+    # no "AnyKernel3" left in anything a recovery prints
+    if grep -qi 'anykernel3' "$UPD"; then
+        echo "::warning::update-binary still mentions AnyKernel3 in its output"
+    fi
+    cp -f "$SCRIPT_DIR/../tools/havoc-boot.sh" "$AK3/havoc-boot.sh"
     cp -f "$IMAGE" "$AK3/Image"
     cat >"$AK3/anykernel.sh" <<AKSH
 ### AnyKernel3 Ramdisk Mod Script
@@ -145,7 +169,7 @@ NO_MAGISK_CHECK=1
 
 . tools/ak3-core.sh
 
-ui_print " Installing $KERNEL_NAME $KVER"
+ui_print " " "𝙴𝚟𝚘𝚛𝚎𝚣 ✩  $KERNEL_NAME $KVER" " "
 ui_print " gold: boot carries the kernel only; vendor_boot is untouched"
 
 split_boot
@@ -156,9 +180,22 @@ else
     flash_boot
 fi
 
-ui_print " Done. Reboot to system."
+# HAVOC default ceilings: drop the boot script where KernelSU/BakaSU runs services.
+# Recovery often cannot see an encrypted /data - then the script simply is not installed
+# and the kernel still runs, only without the boot-time ceilings.
+if [ -d /data/adb ]; then
+    ui_print " Installing boot-time frequency ceilings"
+    mkdir -p /data/adb/service.d
+    cp -f havoc-boot.sh /data/adb/service.d/99-havoc.sh
+    chmod 0755 /data/adb/service.d/99-havoc.sh
+else
+    ui_print " /data not mounted - boot ceilings skipped"
+    ui_print " flash the same zip from the app for the boot script to be installed"
+fi
+
+ui_print " " "𝙴𝚟𝚘𝚛𝚎𝚣 ✩  Done. Reboot to system." " "
 AKSH
-    AKZIP="$OUTDIR/AnyKernel3-${BASE}.zip"
+    AKZIP="$OUTDIR/${BRAND_LABEL} kernel ${KVER_SHORT}.zip"
     chmod +x "$AK3/tools/"* "$AK3/META-INF/com/google/android/update-binary" 2>/dev/null || true
     ( cd "$AK3" && zip -r9 -q "$AKZIP" . -x '.git/*' )
     ak_sh="$(unzip -p "$AKZIP" anykernel.sh)"
@@ -169,7 +206,7 @@ AKSH
     # A zip that a recovery cannot actually run is worse than no zip: check the
     # structure the recovery executes, not just that the file exists.
     for f in META-INF/com/google/android/update-binary META-INF/com/google/android/updater-script \
-             tools/ak3-core.sh anykernel.sh Image; do
+             tools/ak3-core.sh anykernel.sh havoc-boot.sh Image; do
         unzip -l "$AKZIP" "$f" >/dev/null 2>&1 || { echo "::error::AnyKernel3 zip is missing $f"; exit 1; }
     done
     if unzip -Z "$AKZIP" | grep -E 'update-binary$' | grep -qv 'rwx'; then
@@ -196,73 +233,32 @@ AKSH
     ls -lh "$AKZIP" | sed 's/^/    /'
 fi
 
-# ------------------------------------------------------------------ raw kernel
-if has image; then
-    cp -f "$IMAGE" "$OUTDIR/Image-$BASE"
-    cp -f "$IMAGE_GZ" "$OUTDIR/Image-$BASE.gz"
-    echo "==> raw kernel: Image-$BASE / Image-$BASE.gz"
+# the generated Image.gz is a build aid, never an artifact
+if [ "$GEN_GZ" = 1 ]; then rm -f "$IMAGE_GZ"; fi
+
+# --------------------------------------------------------------- final check
+# Only the two deliverables may end up in OUTDIR: a release that also carries raw
+# kernels, notes and helpers is exactly what we were told to stop doing.
+expected_zip="${BRAND_LABEL} kernel ${KVER_SHORT}.zip"
+expected_boot="${BOOT_LABEL} Boot.img(A16)"
+leftovers=""
+for f in "$OUTDIR"/*; do
+    name="$(basename "$f")"
+    if [ "$name" = "$expected_zip" ]; then continue; fi
+    if [ "$name" = "$expected_boot" ] && [ -n "$STOCK_BOOT" ]; then continue; fi
+    leftovers="$leftovers $name"
+done
+if [ -n "$leftovers" ]; then
+    echo "::error::unexpected files in $OUTDIR:$leftovers (only the zip and the boot.img ship)"
+    exit 1
 fi
 
-# ------------------------------------------------------- runtime tools + docs
-for f in "$SCRIPT_DIR/../tools/gold-profiles.sh" "$SCRIPT_DIR/../tools/perf-check.sh" "$SCRIPT_DIR/../docs/FEATURES.md"; do
-    [ -f "$f" ] && cp -f "$f" "$OUTDIR/" && echo "==> shipped $(basename "$f")"
-done
-chmod +x "$OUTDIR/gold-profiles.sh" "$OUTDIR/perf-check.sh" 2>/dev/null || true
-
-# the intermediate Image.gz is only a build aid; the artifact is Image-<base>.gz
-[ "$GEN_GZ" = 1 ] && rm -f "$OUTDIR/Image.gz"
-
-# ------------------------------------------------------------------- notes
-{
-    echo "HAVOC · 𝙴𝚟𝚘𝚛𝚎𝚣 • 6.6.118"
-    echo "custom kernel for the Redmi Note 13 5G (gold)"
-    echo "kernel: $KVER"
-    echo "built:  $(date -u +%Y-%m-%dT%H:%M:%SZ)"
-    echo "root flavor: ${EFFECTIVE_ROOT_FLAVOR:-none} (susfs=${EFFECTIVE_USE_SUSFS:-false})"
-    echo "ksu: ${KSU_SHA:-n/a}"
-    echo
-    if [ -f "$OUTDIR/boot.img" ]; then
-        echo "boot.img IS included - it is YOUR stock boot image with only the kernel"
-        echo "payload swapped. Header/cmdline/ramdisk/tail (dtb) are byte-identical to"
-        echo "the image you supplied, so there is nothing guessed:"
-        echo "  fastboot flash boot boot.img"
-        echo "  fastboot reboot"
-        echo
-    else
-        echo "THIS ARTIFACT IS THE KERNEL ONLY (raw Image / Image.gz + AnyKernel3 zip)."
-        echo "No boot.img was packed (no stock boot image was given) - see docs/FLASH.md."
-        echo
-    fi
-    echo "INSTALL (recovery-flashable zip):"
-    echo "  TWRP/SHRP  : Install -> AnyKernel3-*.zip"
-    echo "  app        : KernelFlasher -> Flash kernel / AK3 zip (needs root)"
-    echo "  Both split your existing boot and swap ONLY the kernel, so your stock"
-    echo "  header/dtb/ramdisk stay byte-identical. vendor_boot is never touched."
-    echo
-    echo "ROLLBACK - keep your ROM's stock boot.img and:"
-    echo "  fastboot flash boot <stock-boot.img>"
-    echo "  fastboot reboot"
-    echo
-    echo "If the phone shows a dm-verity / 'device is corrupt' screen, disable"
-    echo "verification once with your ROM's vbmeta:"
-    echo "  fastboot --disable-verity --disable-verification flash vbmeta vbmeta.img"
-    echo
-    echo "Runtime profiles (after root):"
-    echo "  adb push gold-profiles.sh /data/local/tmp/ && adb shell su -c 'sh /data/local/tmp/gold-profiles.sh gaming'"
-    echo "  gold-profiles.sh {status|balanced|gaming|sustained|charge-limit 80|restore}"
-    echo
-    echo "Measurement (no root needed for most of it):"
-    echo "  adb push perf-check.sh /data/local/tmp/ && adb shell sh /data/local/tmp/perf-check.sh"
-    echo "  perf-check.sh dumps governor/policy/uclamp/thermal/GPU/zram/IO state to a file"
-    echo "  you can diff between builds - docs/BENCH.md is the repeatable procedure."
-    echo
-    echo "Feature map: FEATURES.md (what is in the Image, what is vendor-side, what is refused)."
-    echo "Read docs/FLASH.md before the first flash."
-} >"$OUTDIR/NOTES.txt"
-
-( cd "$OUTDIR" && sha256sum boot.img AnyKernel3-*.zip Image-* 2>/dev/null >SHA256SUMS.txt || true )
+if has anykernel; then
+    [ -f "$OUTDIR/$expected_zip" ] || { echo "::error::the recovery zip was not produced"; exit 1; }
+fi
+if [ -n "$STOCK_BOOT" ]; then
+    [ -f "$OUTDIR/$expected_boot" ] || { echo "::error::the boot image was not produced"; exit 1; }
+fi
 
 echo "==> artifacts in $OUTDIR:"
-ls -lh "$OUTDIR"
-echo "==> sha256:"
-cat "$OUTDIR/SHA256SUMS.txt" 2>/dev/null || true
+ls -lh "$OUTDIR" | sed 's/^/    /'

@@ -27,6 +27,22 @@ Two workflows, in the order they should be used:
 
 The old Xiaomi `gold-s-oss` source is Android 13 / kernel 5.10 — **not** compatible with this device as-is. Both workflows build Google's canonical `kernel/common` GKI source for the exact running build.
 
+## Release: exactly four files
+
+| File | What |
+|---|---|
+| `Havoc-GoldenEra Perf kernel 6.6.118.zip` | HAVOC recovery-flashable kernel (BakaSU root, max ceilings) |
+| `Havoc-GoldenEra Boot.img(A16)` | HAVOC patched boot image (fastboot) |
+| `Golden Era V1 kernel 6.6.118.zip` | Golden Era V1 recovery-flashable kernel (same source, `-4k-GoldenEra-v1`) |
+| `Golden Era V1 Boot.img(A16)` | Golden Era V1 patched boot image (fastboot) |
+
+Nothing else is published: no raw `Image`, no notes, no helper scripts. While flashing, the
+recovery shows **𝙴𝚟𝚘𝚛𝚎𝚣 ✩** instead of the upstream AnyKernel3/XDA banner.
+
+HAVOC boots with maximum ceilings: 2000 MHz on the little cluster, 2400 MHz on the big
+cluster, GPU 1068 MHz. The zip installs `/data/adb/service.d/99-havoc.sh`, which applies
+them at every boot; minimum frequencies are untouched, so thermal throttling still works.
+
 ## Custom kernel — what you get
 
 - **Root built into the kernel**: KernelSU (default, the fork SUSFS patches are maintained against) or KernelSU-Next — no Magisk-style patching needed.
