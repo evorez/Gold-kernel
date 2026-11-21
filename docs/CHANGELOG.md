@@ -115,10 +115,14 @@ flash is packed from your own stock image.
 
 ## Release policy
 
-- One release, always the newest content; older `gold-*` releases are deleted
-- It holds one kernel (`HAVOC`, BakaSU builtin): `boot.img`, `Image-...`,
-  `Image-...gz`, `AnyKernel3-...zip`, `SHA256SUMS.txt`, `NOTES.txt`, plus
-  `gold-profiles.sh` and `perf-check.sh`
+- One release (`builds`), always the newest content; every other release is deleted
+- Three builds live inside it, told apart by prefix, all from the same source:
+  `HAVOC-bakasu-*` (`-4k-HAVOC`, BakaSU builtin), `GoldenEraV1-bakasu-*`
+  (`-4k-GoldenEra-v1`, BakaSU builtin), `GoldenEraV1-vanilla-*` (same release string,
+  no root)
+- Each prefix has both shapes: `*-boot.img` (fastboot) and `*.zip` (recovery), plus
+  `Image-*`, `SHA256SUMS`, `NOTES`, `FEATURES`, `gold-profiles.sh`, `perf-check.sh`
+- A build only ever replaces its own prefix, so the three never overwrite each other
 - The body is regenerated from the attached files, so it lists what is really there
 - Artifacts stay labelled **not boot-tested** until a device run is recorded
 
