@@ -44,17 +44,29 @@ flash is packed from your own stock image.
 
 - Scheduling/perf: schedutil default governor, EAS energy model, uclamp (+ task group),
   cpusets, cgroup sched
-- Memory: PSI, memcg, MGLRU, zram algorithms lz4 / lz4hc / lzo / 842 / zstd
+- Memory: PSI, memcg, MGLRU, zram algorithms lz4 / lz4hc / lzo / zstd
 - Storage: ext4, F2FS (+compression), EROFS (+zip), FBE inline crypto, UFS crypto,
   **mq-deadline**
-- Network: BBR + fq default, fq_codel, **CAKE**, WireGuard, **CIFS**,
-  **IP_SET / NETFILTER_XT_SET**
-- Extras: exFAT, NTFS3, tmpfs xattr, gamepad HID (Xbox / PS / Switch), pstore + ramoops
+- Network (perf only): BBR + fq default, fq_codel, CAKE
+- Extras: pstore + ramoops only
 - Root (KernelSU flavor): **KernelSU `64833c00` + SUSFS `f98f0822`** — sus_mount,
   sus_kstat, sus_path, sus_map, spoof_uname, open_redirect, hide_symbols
 - Root: **BakaSU `v4.2.0-rc3`** — builtin, tracepoint hook, no kernel source patches
 - Runtime helper `gold-profiles.sh`: `gaming` / `sustained` / `balanced` /
   `charge-limit 80` / `restore`
+
+## Removed in the trim
+
+These were built in earlier builds and taken out of the feature set because none of
+them changes performance, while each one adds Image size and boot work:
+
+- WireGuard, exFAT, NTFS3, tmpfs xattr
+- USB gamepad HID (Xbox / PlayStation / Switch)
+- 842 zram compression backend (lz4 / lz4hc / lzo / zstd stay)
+- CIFS (SMB) and the ipset / xt_set firewall helpers
+
+The stock defconfig's own choices are untouched — a feature the ROM already had is not
+being disabled, we only stopped forcing extra ones.
 
 ## Not included (on purpose)
 
