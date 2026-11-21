@@ -14,8 +14,8 @@ Statuses: `IMPL` implemented/verified in the build · `PRES` stock behaviour pre
 - **001** act as an ARM64/GKI kernel engineer — the whole repo is that record (`docs/CHANGELOG.md`, `docs/RESEARCH.md`, `docs/BOOTLOOP.md`). `IMPL`
 - **002** project name exactly *HAVOC* — release title, `NOTES`, docs, and inside the kernel (`uname -r` ends in `-HAVOC`). `IMPL`
 - **003** target: Redmi Note 13 5G, `gold` — asserted before every build (`device check`). `IMPL`
-- **004** one final performance kernel, no flavour zoo — the workflow exposes a single `root_flavor` (`bakasu`); one release, one kernel. `IMPL`
-- **005** builtin BakaSU, one coherent root — `CONFIG_KSU=y`, only BakaSU compiled in. `IMPL`
+- **004** one final performance kernel, no flavour zoo — overridden on purpose: the release carries **two brandings of the same source** (`HAVOC` with BakaSU, `Golden Era V1` with BakaSU and with vanilla), because that is what was asked for. `IMPL`
+- **005** builtin BakaSU, one coherent root — `CONFIG_KSU=y` in both HAVOC and Golden Era V1; the vanilla build has no root driver at all. `IMPL`
 - **006** primary goal: measured sustained gaming performance — procedure exists (`docs/BENCH.md`), **no measurement has been made**. `UNTEST`
 - **007** also input latency, UI smoothness, CPU throughput — same procedure, sections 1 and 3. `PROC`
 - **008** never substitute permanent max clocks — no permanent clock/governor change anywhere; `gold-profiles.sh` refuses to leave schedutil and snapshots every value. `IMPL`
