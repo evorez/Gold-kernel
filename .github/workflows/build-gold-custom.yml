@@ -394,18 +394,30 @@ jobs:
           fi
 
           # this brand replaces only its own two files
-          for a in $(gh release view "$TAG" --repo "$GITHUB_REPOSITORY" --json assets --jq '.assets[].name'); do
+          while IFS= read -r a; do
+            [ -n "$a" ] || continue
             for m in $MINE; do
               [ "$a" = "$m" ] && gh release delete-asset "$TAG" "$a" --repo "$GITHUB_REPOSITORY" -y >/dev/null 2>&1 || true
             done
-          done
+          done < <(gh release view "$TAG" --repo "$GITHUB_REPOSITORY" --json assets --jq '.assets[].name')
 
-          for f in "$GITHUB_WORKSPACE"/artifacts/*; do
-            gh release upload "$TAG" "$f" --repo "$GITHUB_REPOSITORY" --clobber
+          # upload the two deliverables, and fail loudly if either is missing
+          # (a silent no-op here is how a release ends up with zero assets)
+          missing=0
+          for name in $MINE; do
+            f="$GITHUB_WORKSPACE/artifacts/$name"
+            if [ -f "$f" ]; then
+              gh release upload "$TAG" "$f" --repo "$GITHUB_REPOSITORY" --clobber
+            else
+              echo "::error::expected artifact missing: $f"
+              missing=1
+            fi
           done
+          [ "$missing" = 0 ] || exit 1
 
           # anything that is not one of the four allowed names goes away
-          for a in $(gh release view "$TAG" --repo "$GITHUB_REPOSITORY" --json assets --jq '.assets[].name'); do
+          while IFS= read -r a; do
+            [ -n "$a" ] || continue
             keep=0
             OLDIFS=$IFS; IFS='|'
             for allowed in $ALLOWED; do
@@ -413,20 +425,26 @@ jobs:
             done
             IFS=$OLDIFS
             [ "$keep" = 0 ] && gh release delete-asset "$TAG" "$a" --repo "$GITHUB_REPOSITORY" -y >/dev/null 2>&1 || true
-          done
+          done < <(gh release view "$TAG" --repo "$GITHUB_REPOSITORY" --json assets --jq '.assets[].name')
+
+          # never report success with an empty release
+          count=$(gh release view "$TAG" --repo "$GITHUB_REPOSITORY" --json assets --jq '.assets | length')
+          echo "release assets now: $count"
+          [ "$count" -gt 0 ] || { echo "::error::release $TAG has no assets after publish"; exit 1; }
 
           {
             echo "**Havoc + Golden Era V1** for the Redmi Note 13 5G (gold) - by 𝙴𝚟𝚘𝚛𝚎𝚣."
             echo
             echo "Same source (\`${EXPECTED_FULL_SHA}\`, \`${COMMON_TAG}\`, kernel ${KVER}, 4 KB pages). Four files, nothing else:"
             echo
-            for a in $(gh release view "$TAG" --repo "$GITHUB_REPOSITORY" --json assets --jq '.assets[].name' | sort); do
+            while IFS= read -r a; do
+              [ -n "$a" ] || continue
               case "$a" in
                 *.zip)  echo "- \`$a\` - recovery-flashable (TWRP / SHRP / KernelFlasher)" ;;
                 *Boot.img*) echo "- \`$a\` - patched boot image for fastboot: your stock header/ramdisk, only the kernel swapped" ;;
                 *) echo "- \`$a\`" ;;
               esac
-            done
+            done < <(gh release view "$TAG" --repo "$GITHUB_REPOSITORY" --json assets --jq '.assets[].name' | sort)
             echo
             echo "HAVOC boots with maximum ceilings: 2000 MHz little cluster, 2400 MHz big cluster, GPU 1068 MHz (applied by a boot script the zip installs as \`/data/adb/service.d/99-havoc.sh\`; minimums are untouched so thermal still throttles)."
             echo
