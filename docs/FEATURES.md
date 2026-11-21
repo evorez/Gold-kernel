@@ -41,6 +41,7 @@ Legend
 | Android cpusets / task profiles | ✅ | `CONFIG_CPUSETS=y`, `CONFIG_CGROUP_SCHED=y` — cpusets + uclamp are what `task_profiles.json` drives (userspace part is stock Android) |
 | MTK FPSGO / GED / PPM / PBM compatibility | 🔧 | These are vendor modules; they work because the scheduler ABI is unchanged. No duplicate/competing implementation is added. |
 | Dynamic CPU + GPU DVFS | ✅ / 🔧 | CPU: schedutil + `PM_DEVFREQ`/`DEVFREQ_THERMAL`; GPU DVFS is MediaTek's (`ged`, `gpufreq`) and stays untouched. |
+| HAVOC defaults (max ceilings) | ✅ | `gold-profiles.sh havoc` + `/data/adb/service.d/99-havoc.sh`: 2000 MHz little / 2400 MHz big / GPU 1068 MHz ceilings, fastest schedutil ramp, `mq-deadline`. Minimums untouched — thermal still throttles. |
 | Balanced + gaming + sustained profiles | 🧩 | `gold-profiles.sh {balanced,gaming,sustained}` — runtime, reversible, snapshot/restore per value. Never a permanent max clock, never a non-schedutil governor. |
 
 ## MEMORY

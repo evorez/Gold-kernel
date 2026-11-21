@@ -1,17 +1,20 @@
 #!/system/bin/sh
-# gold-profiles - balanced / gaming / sustained runtime profiles for gold
+# gold-profiles - balanced / gaming / sustained / havoc runtime profiles for gold
 # (Xiaomi Redmi Note 13 5G), plus an optional charge limit.
 #
-# These are *runtime* tunables on purpose. Baking a fixed policy into the kernel
-# is exactly what this project refuses to do (no permanent max clocks, no fixed
-# performance governor, no thermal bypass). Every value written here is either
-# restored from a snapshot or reverted by `gold-profiles balanced`.
+# These are *runtime* tunables on purpose: even the aggressive `havoc` profile only
+# raises the frequency CEILING to the hardware maximum, it never pins a minimum to it,
+# so thermal mitigation and the Power HAL still work. The governor always stays
+# schedutil, thermal trips/voltages/GPU OPP tables are never written, and everything is
+# snapshotted so `restore` puts the phone back exactly as it was.
 #
 # Usage (as root):
 #   gold-profiles status            show governor/uclamp/freq/zram/IO/thermal/suspend
 #   gold-profiles balanced          stock-like scheduler tuning (default)
 #   gold-profiles gaming            top-app gets uclamp min + faster freq ramp-up
 #   gold-profiles sustained         cap max CPU freq (~80%) for heat/battery
+#   gold-profiles havoc             max ceilings: 2000 MHz little / 2400 MHz big,
+#                                   GPU 1068 MHz, fastest schedutil ramp (see below)
 #   gold-profiles charge-limit 80   stop charging at 80% (vendor node, best effort)
 #   gold-profiles charge-limit off  clear the limit
 #   gold-profiles restore           put back everything we snapshotted
@@ -113,6 +116,40 @@ profile_gaming() {
     done
     put /dev/cpuset/top-app/uclamp.min 512
     put /dev/cpuset/top-app/uclamp.max 1024
+    for q in /sys/block/*/queue/scheduler; do
+        [ -f "$q" ] && put "$q" mq-deadline
+    done
+    say "  note: thermal protection is untouched - sustained load will still throttle"
+}
+
+# havoc: the default HAVOC performance set. Ceilings are the hardware maxima the user
+# asked for (MT6833: 2x A76 @ 2400 MHz, 6x A55 @ 2000 MHz, Mali-G57 @ 1068 MHz), but the
+# real hw maximum read from the node wins if it is lower - no invented values, and the
+# minimum is left alone so thermal can still throttle.
+profile_havoc() {
+    say "profile: havoc (max ceilings, thermal still active)"
+    require_schedutil
+    for p in $(cpu_policies); do
+        hw=$(cat "$p/cpuinfo_max_freq" 2>/dev/null || echo 0)
+        [ "${hw:-0}" -gt 0 ] || continue
+        if [ "$hw" -ge 2200000 ]; then target=2400000; else target=2000000; fi
+        [ "$target" -gt "$hw" ] && target=$hw
+        put "$p/scaling_max_freq" "$target"
+        put "$p/schedutil/up_rate_limit_us" 500
+        put "$p/schedutil/down_rate_limit_us" 20000
+    done
+    # GPU ceiling: node may report Hz or MHz, so decide by magnitude
+    for d in /sys/class/misc/mali0/device/devfreq/* /sys/class/devfreq/*mali*; do
+        [ -d "$d" ] || continue
+        cur=$(cat "$d/max_freq" 2>/dev/null || echo 0)
+        [ "${cur:-0}" -gt 0 ] || continue
+        if [ "$cur" -gt 10000000 ]; then target=1068000000; else target=1068; fi
+        [ "$target" -gt "$cur" ] && target=$cur
+        put "$d/max_freq" "$target"
+    done
+    put /dev/cpuset/top-app/uclamp.min 512
+    put /dev/cpuset/top-app/uclamp.max 1024
+    put /dev/cpuset/background/uclamp.max 512
     for q in /sys/block/*/queue/scheduler; do
         [ -f "$q" ] && put "$q" mq-deadline
     done
@@ -222,7 +259,8 @@ case "${1:-status}" in
     balanced)      snapshot; profile_balanced ;;
     gaming)        snapshot; profile_gaming ;;
     sustained)     snapshot; profile_sustained ;;
+    havoc)         snapshot; profile_havoc ;;
     charge-limit)  shift; charge_limit "${1:-}" ;;
     restore)       do_restore ;;
-    *)             say "usage: gold-profiles {status|balanced|gaming|sustained|charge-limit <pct|off>|restore}" ;;
+    *)             say "usage: gold-profiles {status|balanced|gaming|sustained|havoc|charge-limit <pct|off>|restore}" ;;
 esac

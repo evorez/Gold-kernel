@@ -117,6 +117,8 @@ env:
   KERNEL_NAME: GoldenEra
   BRAND: ${{ inputs.brand }}
   LOCALVERSION_EXTRA: ${{ inputs.brand == 'GoldenEra-v1' && '-GoldenEra-v1' || '-HAVOC' }}
+  BRAND_LABEL: ${{ inputs.brand == 'GoldenEra-v1' && 'Golden Era V1' || 'Havoc-GoldenEra Perf' }}
+  BOOT_LABEL: ${{ inputs.brand == 'GoldenEra-v1' && 'Golden Era V1' || 'Havoc-GoldenEra' }}
   ROOT_FLAVOR: ${{ inputs.root_flavor }}
   USE_SUSFS: ${{ inputs.use_susfs }}
   TWEAKS: ${{ inputs.tweaks }}
@@ -331,7 +333,7 @@ jobs:
         run: |
           export DIST="$GITHUB_WORKSPACE/dist"
           export OUTDIR="$GITHUB_WORKSPACE/artifacts"
-          export KERNEL_NAME FORMATS
+          export KERNEL_NAME FORMATS BRAND_LABEL BOOT_LABEL
           if [ -f "$GITHUB_WORKSPACE/stock/boot.img" ]; then
             export STOCK_BOOT="$GITHUB_WORKSPACE/stock/boot.img"
           fi
@@ -377,85 +379,69 @@ jobs:
           set -euo pipefail
           TAG="${{ inputs.release_tag }}"
           TAG="${TAG:-builds}"
-          BRAND="${BRAND:-HAVOC}"
-          FLAVOR="${EFFECTIVE_ROOT_FLAVOR:-none}"
-          case "$FLAVOR" in none) FLAVOR_LABEL="vanilla" ;; *) FLAVOR_LABEL="$FLAVOR" ;; esac
-          PREFIX="${BRAND}-${FLAVOR_LABEL}"
-          TITLE="Golden Era V1 + HAVOC · 𝙴𝚟𝚘𝚛𝚎𝚣 • 6.6.118"
+          KVER="${EXPECTED_VERSION}"
+          TITLE="Havoc + Golden Era V1 · 𝙴𝚟𝚘𝚛𝚎𝚣 • 6.6.118"
 
-          # Every build keeps its own prefix so the two kernels never overwrite each
-          # other: HAVOC-bakasu-*, GoldenEraV1-bakasu-*, GoldenEraV1-vanilla-*.
-          stage=/tmp/release-stage
-          rm -rf "$stage"; mkdir -p "$stage"
-          for f in "$GITHUB_WORKSPACE"/artifacts/*; do
-            base="$(basename "$f")"
-            cp "$f" "$stage/${PREFIX}-${base}"
-          done
-          ls -l "$stage"
+          # Exactly four files in the release, two per brand:
+          #   Havoc-GoldenEra Perf kernel 6.6.118.zip / Havoc-GoldenEra Boot.img(A16)
+          #   Golden Era V1 kernel 6.6.118.zip        / Golden Era V1 Boot.img(A16)
+          ALLOWED="Havoc-GoldenEra Perf kernel ${KVER}.zip|Havoc-GoldenEra Boot.img(A16)|Golden Era V1 kernel ${KVER}.zip|Golden Era V1 Boot.img(A16)"
+          MINE="${BRAND_LABEL} kernel ${KVER}.zip ${BOOT_LABEL} Boot.img(A16)"
 
           if ! gh release view "$TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
-            gh release create "$TAG" --repo "$GITHUB_REPOSITORY" --title "$TITLE" \
-              --notes "Build in progress." \
+            gh release create "$TAG" --repo "$GITHUB_REPOSITORY" --title "$TITLE" --notes "Build in progress." \
               || gh release view "$TAG" --repo "$GITHUB_REPOSITORY" >/dev/null
           fi
-          # Replace only this build's own files, never the other kernel's.
+
+          # this brand replaces only its own two files
           for a in $(gh release view "$TAG" --repo "$GITHUB_REPOSITORY" --json assets --jq '.assets[].name'); do
-            case "$a" in
-              "${PREFIX}-"*) gh release delete-asset "$TAG" "$a" --repo "$GITHUB_REPOSITORY" -y >/dev/null 2>&1 || true ;;
-            esac
+            for m in $MINE; do
+              [ "$a" = "$m" ] && gh release delete-asset "$TAG" "$a" --repo "$GITHUB_REPOSITORY" -y >/dev/null 2>&1 || true
+            done
           done
-          gh release upload "$TAG" "$stage"/* --repo "$GITHUB_REPOSITORY" --clobber
+
+          for f in "$GITHUB_WORKSPACE"/artifacts/*; do
+            gh release upload "$TAG" "$f" --repo "$GITHUB_REPOSITORY" --clobber
+          done
+
+          # anything that is not one of the four allowed names goes away
+          for a in $(gh release view "$TAG" --repo "$GITHUB_REPOSITORY" --json assets --jq '.assets[].name'); do
+            keep=0
+            OLDIFS=$IFS; IFS='|'
+            for allowed in $ALLOWED; do
+              [ "$a" = "$allowed" ] && keep=1
+            done
+            IFS=$OLDIFS
+            [ "$keep" = 0 ] && gh release delete-asset "$TAG" "$a" --repo "$GITHUB_REPOSITORY" -y >/dev/null 2>&1 || true
+          done
 
           {
-            echo "**Golden Era V1 + HAVOC** for the Redmi Note 13 5G (gold) - by 𝙴𝚟𝚘𝚛𝚎𝚣."
+            echo "**Havoc + Golden Era V1** for the Redmi Note 13 5G (gold) - by 𝙴𝚟𝚘𝚛𝚎𝚣."
             echo
-            echo "Same source (\`${EXPECTED_FULL_SHA}\`, \`${COMMON_TAG}\`, kernel ${EXPECTED_VERSION}, 4 KB pages), three builds, told apart by prefix:"
+            echo "Same source (\`${EXPECTED_FULL_SHA}\`, \`${COMMON_TAG}\`, kernel ${KVER}, 4 KB pages). Four files, nothing else:"
             echo
-            echo "- \`HAVOC-bakasu-*\` - release string \`-4k-HAVOC\`, **BakaSU builtin** root"
-            echo "- \`GoldenEraV1-bakasu-*\` - release string \`-4k-GoldenEra-v1\`, **BakaSU builtin** root"
-            echo "- \`GoldenEraV1-vanilla-*\` - release string \`-4k-GoldenEra-v1\`, **no root**"
+            for a in $(gh release view "$TAG" --repo "$GITHUB_REPOSITORY" --json assets --jq '.assets[].name' | sort); do
+              case "$a" in
+                *.zip)  echo "- \`$a\` - recovery-flashable (TWRP / SHRP / KernelFlasher)" ;;
+                *Boot.img*) echo "- \`$a\` - patched boot image for fastboot: your stock header/ramdisk, only the kernel swapped" ;;
+                *) echo "- \`$a\`" ;;
+              esac
+            done
             echo
-            echo "Every build comes in both shapes: \`*-boot.img\` (fastboot) and \`*.zip\` (recovery)."
+            echo "HAVOC boots with maximum ceilings: 2000 MHz little cluster, 2400 MHz big cluster, GPU 1068 MHz (applied by a boot script the zip installs as \`/data/adb/service.d/99-havoc.sh\`; minimums are untouched so thermal still throttles)."
             echo
-            gh release view "$TAG" --repo "$GITHUB_REPOSITORY" --json assets --jq '.assets[].name' \
-              | sort | while IFS= read -r a; do
-                  case "$a" in
-                    *-boot.img)    echo "- \`$a\` - **patched boot.img**: your stock boot image with only the kernel payload swapped" ;;
-                    *.zip)         echo "- \`$a\` - **recovery-flashable AnyKernel3 zip**" ;;
-                    *.gz)          echo "- \`$a\` - kernel, gzip" ;;
-                    *Image-*)      echo "- \`$a\` - raw kernel" ;;
-                    *SHA256SUMS*)  echo "- \`$a\` - checksums" ;;
-                    *NOTES*)       echo "- \`$a\` - install notes + rollback" ;;
-                    *FEATURES*)    echo "- \`$a\` - what is in the Image, what is vendor-side, what is refused" ;;
-                    *gold-profiles*) echo "- \`$a\` - runtime profiles" ;;
-                    *perf-check*)  echo "- \`$a\` - read-only state dump" ;;
-                    *)             echo "- \`$a\`" ;;
-                  esac
-                done
+            echo "Gates: pinned source, config read-back, policy gate, **9444/9444 KMI CRC parity** against stock, boot.img repack assertions."
             echo
-            echo "Gates every build passed: pinned source, config read-back, policy gate, **9444/9444 KMI CRC parity** against the stock GKI build (15511674), boot.img repack assertions."
-            echo
-            echo "**Boot status:** the KernelSU+SUSFS build (\`-4k-golden\`) is the last one confirmed booting on the phone. The \`-HAVOC\` and \`-GoldenEra-v1\` BakaSU builds and the vanilla build are **not boot-tested**."
-            echo
-            echo "**No performance claim.** Nothing was benchmarked - \`docs/BENCH.md\` is the procedure, \`docs/AUDIT.md\` maps the 101 requirements."
-            echo
-            echo "Install: \`fastboot flash boot <prefix>-boot.img\`, or flash the zip from recovery. Keep your stock boot image for rollback."
-            echo
-            echo "Root manager: the APK published by \`Baka-SU/BakaSU\` at the same tag - see \`docs/ROOT.md\`."
-            echo
-            echo "This build: ${PREFIX} (run #${{ github.run_number }}, tweaks=${TWEAKS:-false})."
-          } > /tmp/release-notes.md
+            echo "**Not boot-tested.** Keep your stock boot image for rollback."
+          } >/tmp/release-notes.md
           gh release edit "$TAG" --repo "$GITHUB_REPOSITORY" --title "$TITLE" --notes-file /tmp/release-notes.md
 
-          # one release only: any other release (old tags) is superseded
           for old in $(gh release list --repo "$GITHUB_REPOSITORY" --limit 100 --json tagName --jq '.[].tagName'); do
             [ "$old" = "$TAG" ] && continue
             echo "removing superseded release $old"
             gh release delete "$old" --repo "$GITHUB_REPOSITORY" --cleanup-tag -y || true
           done
-          echo "release URL: https://github.com/$GITHUB_REPOSITORY/releases/tag/$TAG" >>"$GITHUB_STEP_SUMMARY"
           echo "release: https://github.com/$GITHUB_REPOSITORY/releases/tag/$TAG"
-
 
       - name: Diagnostics on failure (annotations)
         if: failure()
